@@ -3,8 +3,8 @@ import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { Transaction, GroundingSource } from "../types";
 
 export const classifyTransactions = async (transactions: Transaction[]): Promise<Transaction[]> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+
   // Prepare the prompt
   // We send descriptions in batches to be efficient
   const transactionData = transactions.map(t => ({
@@ -48,7 +48,7 @@ export const classifyTransactions = async (transactions: Transaction[]): Promise
     });
 
     const results = JSON.parse(response.text || "[]");
-    
+
     // Extract grounding sources if search was used
     const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
     const sources: GroundingSource[] = groundingChunks?.map((chunk: any) => ({
