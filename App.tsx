@@ -99,8 +99,12 @@ const App: React.FC = () => {
   };
 
   const handleSelectReport = (report: SavedReport) => {
+    console.log(`Selecting report: ${report.name}`, report);
+    if (!report.transactions || report.transactions.length === 0) {
+      console.warn('Report has no transactions:', report);
+    }
     setCurrentReport(report);
-    setTransactions(report.transactions);
+    setTransactions(report.transactions || []);
     setStatus(AppState.COMPLETED);
     setCompareReport(null);
   };

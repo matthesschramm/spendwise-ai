@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabase";
 
 export const storageService = {
   saveReport: async (report: SavedReport, userId: string): Promise<void> => {
+    console.log('Saving report to Supabase:', report.id);
     const { error } = await supabase
       .from('reports')
       .insert([
@@ -10,7 +11,7 @@ export const storageService = {
           id: report.id,
           name: report.name,
           timestamp: report.timestamp,
-          data: report,
+          data: report, // This is the full SavedReport object
           user_id: userId
         }
       ]);
@@ -32,7 +33,17 @@ export const storageService = {
       return [];
     }
 
-    return (data || []).map(row => row.data as SavedReport);
+    console.log(`Fetched ${data?.length || 0} reports from Supabase`);
+    // Ensure we return a clean SavedReport object
+    return (data || []).map(row => {
+      const report = row.data as SavedReport;
+      return {
+        ...report,
+        id: row.id, // Column takes precedence
+        name: row.name,
+        timestamp: row.timestamp
+      };
+    });
   },
 
   deleteReport: async (id: string, userId: string): Promise<void> => {
