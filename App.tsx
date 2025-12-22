@@ -21,25 +21,29 @@ const App: React.FC = () => {
 
   // Load history on mount
   useEffect(() => {
-    setSavedReports(storageService.getAllReports());
+    const loadReports = async () => {
+      const reports = await storageService.getAllReports();
+      setSavedReports(reports);
+    };
+    loadReports();
   }, []);
 
   const handleFileUpload = useCallback(async (csvText: string) => {
     setStatus(AppState.PARSING);
     setError(null);
-    
+
     try {
       const parsedData = parseCSV(csvText);
       if (parsedData.length === 0) {
         throw new Error("No valid transactions found in the CSV.");
       }
-      
+
       setTransactions(parsedData);
       setStatus(AppState.ANALYZING);
 
       const chunkSize = 20;
       const analyzedTransactions: Transaction[] = [];
-      
+
       for (let i = 0; i < parsedData.length; i += chunkSize) {
         const chunk = parsedData.slice(i, i + chunkSize);
         const classifiedChunk = await classifyTransactions(chunk);
@@ -55,9 +59,9 @@ const App: React.FC = () => {
     }
   }, []);
 
-  const saveCurrentAnalysis = () => {
+  const saveCurrentAnalysis = async () => {
     if (!reportName.trim()) return;
-    
+
     const totalSpent = transactions.reduce((acc, t) => acc + t.amount, 0);
     const newReport: SavedReport = {
       id: `report-${Date.now()}`,
@@ -67,8 +71,9 @@ const App: React.FC = () => {
       totalSpent
     };
 
-    storageService.saveReport(newReport);
-    setSavedReports(storageService.getAllReports());
+    await storageService.saveReport(newReport);
+    const reports = await storageService.getAllReports();
+    setSavedReports(reports);
     setReportName("");
     setCurrentReport(newReport);
   };
@@ -80,9 +85,10 @@ const App: React.FC = () => {
     setCompareReport(null);
   };
 
-  const handleDeleteReport = (id: string) => {
-    storageService.deleteReport(id);
-    setSavedReports(storageService.getAllReports());
+  const handleDeleteReport = async (id: string) => {
+    await storageService.deleteReport(id);
+    const reports = await storageService.getAllReports();
+    setSavedReports(reports);
     if (currentReport?.id === id) reset();
   };
 
@@ -92,8 +98,8 @@ const App: React.FC = () => {
       return;
     }
     if (currentReport.id === report.id) {
-       setCompareReport(null);
-       return;
+      setCompareReport(null);
+      return;
     }
     setCompareReport(report);
     setStatus(AppState.COMPARING);
@@ -119,7 +125,7 @@ const App: React.FC = () => {
           </div>
           <div className="flex items-center gap-4">
             {status !== AppState.IDLE && (
-              <button 
+              <button
                 onClick={reset}
                 className="text-sm text-slate-600 hover:text-slate-900 font-medium px-4 py-2 flex items-center gap-2"
               >
@@ -140,14 +146,14 @@ const App: React.FC = () => {
                 Analyze your monthly statements with Gemini's AI or compare your historical spending trends.
               </p>
             </div>
-            
+
             <div className="max-w-xl mx-auto mb-16">
               <FileUpload onFileSelect={handleFileUpload} disabled={status !== AppState.IDLE} />
             </div>
 
-            <ReportHistory 
-              reports={savedReports} 
-              onSelect={handleSelectReport} 
+            <ReportHistory
+              reports={savedReports}
+              onSelect={handleSelectReport}
               onDelete={handleDeleteReport}
               onCompare={handleCompareTrigger}
               selectedForComparison={currentReport?.id || null}
@@ -158,10 +164,10 @@ const App: React.FC = () => {
         {(status === AppState.PARSING || status === AppState.ANALYZING) && (
           <div className="flex flex-col items-center justify-center p-20 text-center">
             <div className="relative mb-8">
-               <div className="w-20 h-20 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
-               <div className="absolute inset-0 flex items-center justify-center">
-                 <i className="fa-solid fa-brain text-blue-600 animate-pulse text-xl"></i>
-               </div>
+              <div className="w-20 h-20 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <i className="fa-solid fa-brain text-blue-600 animate-pulse text-xl"></i>
+              </div>
             </div>
             <h3 className="text-2xl font-bold text-slate-800">
               {status === AppState.PARSING ? "Reading your statement..." : "AI Classification in progress..."}
@@ -186,17 +192,17 @@ const App: React.FC = () => {
                 </h2>
                 <p className="text-slate-500">Categorized by Gemini AI</p>
               </div>
-              
+
               {!currentReport && (
                 <div className="flex gap-2 w-full md:w-auto">
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     placeholder="Report Name (e.g. Jan 2024)"
                     value={reportName}
                     onChange={(e) => setReportName(e.target.value)}
                     className="flex-1 md:w-64 px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                  <button 
+                  <button
                     onClick={saveCurrentAnalysis}
                     disabled={!reportName.trim()}
                     className="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold disabled:opacity-50 hover:bg-blue-700 transition-colors"
@@ -209,17 +215,17 @@ const App: React.FC = () => {
 
             <Dashboard transactions={transactions} />
             <TransactionList transactions={transactions} />
-            
+
             {savedReports.length > 1 && (
-               <div className="mt-12 pt-12 border-t border-slate-100">
-                  <ReportHistory 
-                    reports={savedReports.filter(r => r.id !== currentReport?.id)} 
-                    onSelect={handleSelectReport} 
-                    onDelete={handleDeleteReport}
-                    onCompare={handleCompareTrigger}
-                    selectedForComparison={null}
-                  />
-               </div>
+              <div className="mt-12 pt-12 border-t border-slate-100">
+                <ReportHistory
+                  reports={savedReports.filter(r => r.id !== currentReport?.id)}
+                  onSelect={handleSelectReport}
+                  onDelete={handleDeleteReport}
+                  onCompare={handleCompareTrigger}
+                  selectedForComparison={null}
+                />
+              </div>
             )}
           </div>
         )}
@@ -227,10 +233,10 @@ const App: React.FC = () => {
         {status === AppState.COMPARING && currentReport && compareReport && (
           <div className="animate-in slide-in-from-bottom duration-500">
             <div className="flex justify-between items-center mb-8">
-               <h2 className="text-3xl font-bold text-slate-900">Month-on-Month Comparison</h2>
-               <button onClick={() => setStatus(AppState.COMPLETED)} className="text-slate-500 hover:text-slate-800 font-medium">
-                  Back to Details
-               </button>
+              <h2 className="text-3xl font-bold text-slate-900">Month-on-Month Comparison</h2>
+              <button onClick={() => setStatus(AppState.COMPLETED)} className="text-slate-500 hover:text-slate-800 font-medium">
+                Back to Details
+              </button>
             </div>
             <ComparisonView reportA={currentReport} reportB={compareReport} />
           </div>
