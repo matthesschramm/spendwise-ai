@@ -22,6 +22,8 @@ const App: React.FC = () => {
   const [currentReport, setCurrentReport] = useState<SavedReport | null>(null);
   const [compareReport, setCompareReport] = useState<SavedReport | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showSavedFeedback, setShowSavedFeedback] = useState(false);
 
   // Auth listener
   useEffect(() => {
@@ -79,23 +81,56 @@ const App: React.FC = () => {
     }
   }, []);
 
-  const saveCurrentAnalysis = async () => {
-    if (!reportName.trim()) return;
+  const saveCurrentAnalysis = async (customReport?: SavedReport) => {
+    if (!customReport && !reportName.trim()) return;
 
-    const totalSpent = transactions.reduce((acc, t) => acc + t.amount, 0);
-    const newReport: SavedReport = {
-      id: `report-${Date.now()}`,
-      name: reportName,
-      timestamp: Date.now(),
-      transactions: transactions,
-      totalSpent
-    };
+    setIsSaving(true);
+    try {
+      const reportToSave = customReport || {
+        id: `report-${Date.now()}`,
+        name: reportName,
+        timestamp: Date.now(),
+        transactions: transactions,
+        totalSpent: transactions.reduce((acc, t) => acc + t.amount, 0)
+      };
 
-    await storageService.saveReport(newReport, session!.user.id);
-    const reports = await storageService.getAllReports(session!.user.id);
-    setSavedReports(reports);
-    setReportName("");
-    setCurrentReport(newReport);
+      await storageService.saveReport(reportToSave, session!.user.id);
+
+      const reports = await storageService.getAllReports(session!.user.id);
+      setSavedReports(reports);
+
+      if (!customReport) {
+        setReportName("");
+        setCurrentReport(reportToSave);
+      } else {
+        setCurrentReport(reportToSave);
+      }
+
+      // Show success feedback
+      setShowSavedFeedback(true);
+      setTimeout(() => setShowSavedFeedback(false), 3000);
+    } catch (err: any) {
+      console.error('Failed to save report:', err);
+      alert(`Error saving: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleEditTransactionCategory = (txId: string, newCategory: string) => {
+    const updatedTransactions = transactions.map(t =>
+      t.id === txId ? { ...t, category: newCategory } : t
+    );
+    setTransactions(updatedTransactions);
+
+    // If we're looking at a saved report, we mark it as modified in the UI state
+    if (currentReport) {
+      setCurrentReport({
+        ...currentReport,
+        transactions: updatedTransactions,
+        totalSpent: updatedTransactions.reduce((acc, t) => acc + t.amount, 0)
+      });
+    }
   };
 
   const handleSelectReport = (report: SavedReport) => {
@@ -230,7 +265,28 @@ const App: React.FC = () => {
                 <h2 className="text-2xl font-extrabold text-slate-900">
                   {currentReport ? currentReport.name : "New Expenditure Analysis"}
                 </h2>
-                <p className="text-slate-500">Categorized by Gemini AI</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-slate-500">Categorized by Gemini AI</p>
+                  {currentReport && (
+                    <button
+                      onClick={() => saveCurrentAnalysis(currentReport)}
+                      disabled={isSaving}
+                      className={`text-xs px-2 py-1 rounded border transition-all flex items-center gap-1 ${showSavedFeedback
+                        ? 'bg-green-600 text-white border-green-600'
+                        : 'bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-100'
+                        }`}
+                    >
+                      {isSaving ? (
+                        <i className="fa-solid fa-circle-notch animate-spin"></i>
+                      ) : showSavedFeedback ? (
+                        <i className="fa-solid fa-check"></i>
+                      ) : (
+                        <i className="fa-solid fa-save"></i>
+                      )}
+                      {isSaving ? 'Saving...' : showSavedFeedback ? 'Saved!' : 'Save Changes'}
+                    </button>
+                  )}
+                </div>
               </div>
 
               {!currentReport && (
@@ -254,7 +310,10 @@ const App: React.FC = () => {
             </div>
 
             <Dashboard transactions={transactions} />
-            <TransactionList transactions={transactions} />
+            <TransactionList
+              transactions={transactions}
+              onEditCategory={handleEditTransactionCategory}
+            />
 
             {savedReports.length > 1 && (
               <div className="mt-12 pt-12 border-t border-slate-100">

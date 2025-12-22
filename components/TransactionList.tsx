@@ -1,12 +1,50 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import { Transaction } from '../types';
 
 interface TransactionListProps {
   transactions: Transaction[];
+  onEditCategory?: (id: string, newCategory: string) => void;
 }
 
-const TransactionList: React.FC<TransactionListProps> = ({ transactions }) => {
+const COMMON_CATEGORIES = [
+  "Food & Dining",
+  "Transportation",
+  "Entertainment",
+  "Shopping",
+  "Utilities",
+  "Healthcare",
+  "Travel",
+  "Finance",
+  "Income",
+  "Education",
+  "Other"
+];
+
+const TransactionList: React.FC<TransactionListProps> = ({ transactions, onEditCategory }) => {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+
+  const handleCategoryChange = (id: string, newValue: string) => {
+    if (newValue === "Other") {
+      setEditingId(id);
+      setEditValue("");
+      return;
+    }
+
+    if (onEditCategory) {
+      onEditCategory(id, newValue);
+    }
+    setEditingId(null);
+  };
+
+  const handleCustomCategoryBlur = (id: string) => {
+    if (editValue.trim() && onEditCategory) {
+      onEditCategory(id, editValue.trim());
+    }
+    setEditingId(null);
+    setEditValue("");
+  };
+
   return (
     <div className="bg-white mt-8 rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
       <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
@@ -31,36 +69,61 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions }) => {
               <tr key={t.id} className="hover:bg-slate-50 transition-colors">
                 <td className="px-6 py-4 text-sm text-slate-600">{t.date}</td>
                 <td className="px-6 py-4">
-                  <span className="text-sm font-medium text-slate-800">{t.description}</span>
+                  <span className="text-sm font-medium text-slate-800 line-clamp-1" title={t.description}>{t.description}</span>
                 </td>
                 <td className="px-6 py-4">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    {t.category}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {editingId === t.id ? (
+                      <input
+                        type="text"
+                        value={editValue}
+                        placeholder="Type category..."
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onBlur={() => handleCustomCategoryBlur(t.id)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleCustomCategoryBlur(t.id)}
+                        className="text-xs border border-blue-300 rounded px-2 py-1 w-32 focus:ring-2 focus:ring-blue-500 outline-none"
+                        autoFocus
+                      />
+                    ) : (
+                      <select
+                        value={COMMON_CATEGORIES.includes(t.category || "") ? (t.category || "Other") : "Other"}
+                        onChange={(e) => handleCategoryChange(t.id, e.target.value)}
+                        className={`text-xs border border-transparent hover:border-slate-200 rounded px-1 py-0.5 outline-none cursor-pointer transition-colors font-medium ${onEditCategory ? 'text-blue-700 hover:bg-slate-100' : 'text-slate-600 pointer-events-none'
+                          }`}
+                      >
+                        {COMMON_CATEGORIES.map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                        {!COMMON_CATEGORIES.includes(t.category || "") && t.category && (
+                          <option value={t.category}>{t.category}</option>
+                        )}
+                      </select>
+                    )}
+                  </div>
                 </td>
                 <td className="px-6 py-4 text-sm font-bold text-slate-800 text-right">
                   ${t.amount.toFixed(2)}
                 </td>
                 <td className="px-6 py-4">
-                   {t.groundingSources ? (
-                     <div className="flex flex-wrap gap-2">
-                       {t.groundingSources.slice(0, 2).map((s, idx) => (
-                         <a 
-                           key={idx} 
-                           href={s.uri} 
-                           target="_blank" 
-                           rel="noopener noreferrer"
-                           className="text-[10px] text-blue-600 hover:underline flex items-center gap-1 bg-blue-50 px-2 py-0.5 rounded border border-blue-100"
-                           title={s.title}
-                         >
-                           <i className="fa-brands fa-google"></i>
-                           Search Result
-                         </a>
-                       ))}
-                     </div>
-                   ) : (
-                     <span className="text-xs text-slate-400 italic">Direct Identification</span>
-                   )}
+                  {t.groundingSources ? (
+                    <div className="flex flex-wrap gap-2">
+                      {t.groundingSources.slice(0, 2).map((s, idx) => (
+                        <a
+                          key={idx}
+                          href={s.uri}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-blue-600 hover:underline flex items-center gap-1 bg-blue-50 px-2 py-0.5 rounded border border-blue-100"
+                          title={s.title}
+                        >
+                          <i className="fa-brands fa-google"></i>
+                          Search Result
+                        </a>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-slate-400 italic">Direct Identification</span>
+                  )}
                 </td>
               </tr>
             ))}

@@ -3,10 +3,9 @@ import { supabase } from "../lib/supabase";
 
 export const storageService = {
   saveReport: async (report: SavedReport, userId: string): Promise<void> => {
-    console.log('Saving report to Supabase:', report.id);
     const { error } = await supabase
       .from('reports')
-      .insert([
+      .upsert([
         {
           id: report.id,
           name: report.name,
@@ -14,10 +13,11 @@ export const storageService = {
           data: report, // This is the full SavedReport object
           user_id: userId
         }
-      ]);
+      ], { onConflict: 'id' });
 
     if (error) {
       console.error('Error saving report to Supabase:', error);
+      throw error;
     }
   },
 
@@ -34,6 +34,10 @@ export const storageService = {
     }
 
     console.log(`Fetched ${data?.length || 0} reports from Supabase`);
+    if (data && data.length > 0) {
+      console.log('First report categorization sample:', data[0].data.transactions?.[0]?.category);
+    }
+
     // Ensure we return a clean SavedReport object
     return (data || []).map(row => {
       const report = row.data as SavedReport;
