@@ -9,6 +9,9 @@ import ComparisonView from './components/ComparisonView';
 import { parseCSV } from './utils/csvParser';
 import { classifyTransactions } from './services/geminiService';
 import { storageService } from './services/storageService';
+import { supabase } from './lib/supabase';
+import Auth from './components/Auth';
+import { Session } from '@supabase/supabase-js';
 
 const App: React.FC = () => {
   const [status, setStatus] = useState<AppState>(AppState.IDLE);
@@ -18,15 +21,32 @@ const App: React.FC = () => {
   const [reportName, setReportName] = useState("");
   const [currentReport, setCurrentReport] = useState<SavedReport | null>(null);
   const [compareReport, setCompareReport] = useState<SavedReport | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+
+  // Auth listener
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Load history on mount
   useEffect(() => {
+    if (!session) return;
     const loadReports = async () => {
-      const reports = await storageService.getAllReports();
+      const reports = await storageService.getAllReports(session.user.id);
       setSavedReports(reports);
     };
     loadReports();
-  }, []);
+  }, [session]);
 
   const handleFileUpload = useCallback(async (csvText: string) => {
     setStatus(AppState.PARSING);
@@ -71,8 +91,8 @@ const App: React.FC = () => {
       totalSpent
     };
 
-    await storageService.saveReport(newReport);
-    const reports = await storageService.getAllReports();
+    await storageService.saveReport(newReport, session!.user.id);
+    const reports = await storageService.getAllReports(session!.user.id);
     setSavedReports(reports);
     setReportName("");
     setCurrentReport(newReport);
@@ -86,8 +106,8 @@ const App: React.FC = () => {
   };
 
   const handleDeleteReport = async (id: string) => {
-    await storageService.deleteReport(id);
-    const reports = await storageService.getAllReports();
+    await storageService.deleteReport(id, session!.user.id);
+    const reports = await storageService.getAllReports(session!.user.id);
     setSavedReports(reports);
     if (currentReport?.id === id) reset();
   };
@@ -113,6 +133,15 @@ const App: React.FC = () => {
     setCompareReport(null);
   };
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    reset();
+  };
+
+  if (!session) {
+    return <Auth />;
+  }
+
   return (
     <div className="min-h-screen pb-20">
       <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
@@ -133,6 +162,13 @@ const App: React.FC = () => {
                 Home
               </button>
             )}
+            <button
+              onClick={handleLogout}
+              className="text-sm text-slate-500 hover:text-red-600 font-medium px-3 py-1.5 rounded-lg hover:bg-red-50 transition-all flex items-center gap-2 border border-transparent hover:border-red-100"
+            >
+              <i className="fa-solid fa-arrow-right-from-bracket"></i>
+              Logout
+            </button>
           </div>
         </div>
       </header>
