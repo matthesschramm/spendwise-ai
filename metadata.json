@@ -1,0 +1,5 @@
+{
+  "name": "SpendWise AI",
+  "description": "An intelligent expenditure analysis tool that uses Gemini and Google Search to classify credit card transactions and provide deep financial insights.",
+  "requestFramePermissions": []
+}
