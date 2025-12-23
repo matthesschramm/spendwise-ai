@@ -41,12 +41,9 @@ const Auth: React.FC = () => {
         <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
             <div className="max-w-md w-full">
                 <div className="text-center mb-10">
-                    <div className="inline-flex items-center justify-center bg-blue-600 text-white p-3 rounded-2xl mb-4 shadow-lg shadow-blue-200">
-                        <i className="fa-solid fa-wallet text-2xl"></i>
+                    <div className="flex justify-center mb-6">
+                        <img src="/logo.jpg" alt="SpendWise Logo" className="h-24 w-auto object-contain" />
                     </div>
-                    <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-                        SpendWise <span className="text-blue-600">AI</span>
-                    </h1>
                     <p className="text-slate-500 mt-2">
                         {isSignUp ? 'Create your account to get started' : 'Sign in to manage your finances'}
                     </p>

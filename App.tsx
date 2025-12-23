@@ -187,12 +187,9 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen pb-20">
       <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={reset}>
-            <div className="bg-blue-600 text-white p-2 rounded-lg">
-              <i className="fa-solid fa-wallet text-xl"></i>
-            </div>
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">SpendWise <span className="text-blue-600">AI</span></h1>
+        <div className="max-w-6xl mx-auto px-4 h-20 flex items-center justify-between">
+          <div className="flex items-center cursor-pointer h-full py-1" onClick={reset}>
+            <img src="/logo.jpg" alt="SpendWise Logo" className="h-full w-auto object-contain" />
           </div>
           <div className="flex items-center gap-4">
             {status !== AppState.IDLE && (
