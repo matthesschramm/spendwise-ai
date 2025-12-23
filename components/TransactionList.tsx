@@ -7,16 +7,17 @@ interface TransactionListProps {
 }
 
 const COMMON_CATEGORIES = [
-  "Food & Dining",
-  "Transportation",
-  "Entertainment",
+  "Food - Supermarkets",
+  "Food - Dining",
   "Shopping",
+  "Housing",
+  "Transportation",
   "Utilities",
+  "Entertainment",
   "Healthcare",
-  "Travel",
-  "Finance",
   "Income",
-  "Education",
+  "Travel",
+  "Insurance",
   "Other"
 ];
 
@@ -86,7 +87,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onEditC
                       />
                     ) : (
                       <select
-                        value={COMMON_CATEGORIES.includes(t.category || "") ? (t.category || "Other") : "Other"}
+                        value={t.category || "Other"}
                         onChange={(e) => handleCategoryChange(t.id, e.target.value)}
                         className={`text-xs border border-transparent hover:border-slate-200 rounded px-1 py-0.5 outline-none cursor-pointer transition-colors font-medium ${onEditCategory ? 'text-blue-700 hover:bg-slate-100' : 'text-slate-600 pointer-events-none'
                           }`}
