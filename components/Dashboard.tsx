@@ -92,36 +92,62 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
     })).sort((a, b) => b.value - a.value);
   }, [outflows]);
 
-  // 2. Daily Trend Data
+  // 2. Daily Trend Data (Bar Chart logic)
   const dailyTrendData = useMemo(() => {
-    const daily: Record<string, { amount: number, transactions: Transaction[] }> = {};
+    if (outflows.length === 0) return [];
+
+    const daily: Record<string, { amount: number; transactions: Transaction[]; dateObj: Date }> = {};
+    const dates: Date[] = [];
+
     outflows.forEach(t => {
-      const dateParts = t.date.split(/[-/]/);
-      let day = t.date;
-      if (dateParts.length >= 2) {
-        day = dateParts.length === 3 ? dateParts[2] : dateParts[1];
-        if (day.length > 2) day = dateParts[1];
+      // Precise parsing for DD/MM/YYYY or YYYY-MM-DD
+      let date: Date;
+      if (t.date.includes('/')) {
+        const parts = t.date.split('/');
+        const d = parseInt(parts[0]);
+        const m = parseInt(parts[1]) - 1;
+        const y = parts[2].length === 2 ? 2000 + parseInt(parts[2]) : parseInt(parts[2]);
+        date = new Date(y, m, d);
+      } else {
+        date = new Date(t.date);
       }
 
-      const dayNum = parseInt(day);
-      const label = isNaN(dayNum) ? t.date : `Day ${dayNum}`;
-      if (!daily[label]) daily[label] = { amount: 0, transactions: [] };
-      daily[label].amount += t.amount;
-      daily[label].transactions.push(t);
+      if (isNaN(date.getTime())) return;
+
+      const key = date.toISOString().split('T')[0];
+      if (!daily[key]) {
+        daily[key] = { amount: 0, transactions: [], dateObj: date };
+        dates.push(date);
+      }
+      daily[key].amount += t.amount;
+      daily[key].transactions.push(t);
     });
 
-    return Object.entries(daily)
-      .map(([day, stats]) => ({
-        day,
-        amount: Number(stats.amount.toFixed(2)),
-        transactions: stats.transactions.sort((a, b) => b.amount - a.amount).slice(0, 5),
-        count: stats.transactions.length
-      }))
-      .sort((a, b) => {
-        const d1 = parseInt(a.day.replace('Day ', ''));
-        const d2 = parseInt(b.day.replace('Day ', ''));
-        return d1 - d2;
+    if (dates.length === 0) return [];
+
+    // Fill in the gaps
+    const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
+    const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+
+    const filledData = [];
+    let current = new Date(minDate);
+
+    while (current <= maxDate) {
+      const key = current.toISOString().split('T')[0];
+      const stats = daily[key];
+
+      filledData.push({
+        day: current.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
+        amount: Number((stats?.amount || 0).toFixed(2)),
+        transactions: (stats?.transactions || []).sort((a, b) => b.amount - a.amount).slice(0, 5),
+        count: stats?.transactions.length || 0,
+        fullDate: key
       });
+
+      current.setDate(current.getDate() + 1);
+    }
+
+    return filledData;
   }, [outflows]);
 
   // 3. Merchant Analysis
@@ -220,19 +246,29 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
           </h3>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={dailyTrendData}>
-                <defs>
-                  <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1} />
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
+              <BarChart data={dailyTrendData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                <YAxis hide />
+                <XAxis
+                  dataKey="day"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 10, fill: '#94a3b8' }}
+                  minTickGap={20}
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 10, fill: '#94a3b8' }}
+                  tickFormatter={(val) => `$${val}`}
+                />
                 <Tooltip content={<CustomTooltip />} wrapperStyle={{ zIndex: 1000 }} />
-                <Area type="monotone" dataKey="amount" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorAmount)" />
-              </AreaChart>
+                <Bar
+                  dataKey="amount"
+                  fill="#3b82f6"
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={40}
+                />
+              </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
