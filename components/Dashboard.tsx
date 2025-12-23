@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import { 
+import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area,
   ComposedChart, Line
@@ -13,44 +13,98 @@ interface DashboardProps {
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#64748b', '#22d3ee', '#fb923c', '#4ade80'];
 
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    const isCategory = !!data.transactions;
+    const title = label || data.name || data.day;
+    const items = data.transactions || [];
+
+    return (
+      <div className="bg-white p-4 rounded-xl shadow-2xl border border-slate-200 min-w-[300px] animate-in fade-in zoom-in duration-200 relative z-[1001] pointer-events-none">
+        <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-100">
+          <span className="text-sm font-black text-slate-900">{title}</span>
+          <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+            ${(data.value || data.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          </span>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+            {items.length > 0 ? 'Top Transactions' : 'Summary'}
+          </p>
+          <div className="max-h-[200px] overflow-y-auto pr-1 custom-scrollbar">
+            {items.length > 0 ? (
+              items.map((t: Transaction, idx: number) => (
+                <div key={t.id || idx} className="flex justify-between items-start gap-4 mb-2">
+                  <div className="flex-1">
+                    <p className="text-[11px] font-medium text-slate-700 leading-tight line-clamp-2">{t.description}</p>
+                    <p className="text-[9px] text-slate-400 mt-0.5">{t.date}</p>
+                  </div>
+                  <span className="text-[11px] font-black text-slate-900">${t.amount.toLocaleString()}</span>
+                </div>
+              ))
+            ) : (
+              <p className="text-[11px] text-slate-500 italic">No detailed breakdown available</p>
+            )}
+          </div>
+          {data.count > 5 && (
+            <p className="text-[10px] text-blue-500 font-bold mt-1 text-center bg-blue-50 py-1 rounded">
+              + {data.count - 5} more transactions
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
   // 1. Category Data
   const categoryData = useMemo(() => {
-    const summary: Record<string, { value: number, count: number }> = {};
+    const summary: Record<string, { value: number, count: number, transactions: Transaction[] }> = {};
     transactions.forEach(t => {
       const cat = t.category || "Other";
-      if (!summary[cat]) summary[cat] = { value: 0, count: 0 };
+      if (!summary[cat]) summary[cat] = { value: 0, count: 0, transactions: [] };
       summary[cat].value += t.amount;
       summary[cat].count += 1;
+      summary[cat].transactions.push(t);
     });
 
     return Object.entries(summary).map(([name, stats]) => ({
       name,
       value: Number(stats.value.toFixed(2)),
-      count: stats.count
+      count: stats.count,
+      transactions: stats.transactions.sort((a, b) => b.amount - a.amount).slice(0, 5)
     })).sort((a, b) => b.value - a.value);
   }, [transactions]);
 
   // 2. Daily Trend Data
   const dailyTrendData = useMemo(() => {
-    const daily: Record<string, number> = {};
+    const daily: Record<string, { amount: number, transactions: Transaction[] }> = {};
     transactions.forEach(t => {
-      // Try to extract day from date string (Assuming common formats like MM/DD/YYYY or YYYY-MM-DD)
       const dateParts = t.date.split(/[-/]/);
-      let day = t.date; // fallback
+      let day = t.date;
       if (dateParts.length >= 2) {
-        // Find the part that looks like a day (usually the 2nd part or 3rd)
         day = dateParts.length === 3 ? dateParts[2] : dateParts[1];
-        if (day.length > 2) day = dateParts[1]; // handle YYYY-MM-DD vs MM-DD-YYYY
+        if (day.length > 2) day = dateParts[1];
       }
-      
+
       const dayNum = parseInt(day);
       const label = isNaN(dayNum) ? t.date : `Day ${dayNum}`;
-      daily[label] = (daily[label] || 0) + t.amount;
+      if (!daily[label]) daily[label] = { amount: 0, transactions: [] };
+      daily[label].amount += t.amount;
+      daily[label].transactions.push(t);
     });
 
     return Object.entries(daily)
-      .map(([day, amount]) => ({ day, amount: Number(amount.toFixed(2)) }))
+      .map(([day, stats]) => ({
+        day,
+        amount: Number(stats.amount.toFixed(2)),
+        transactions: stats.transactions.sort((a, b) => b.amount - a.amount).slice(0, 5),
+        count: stats.transactions.length
+      }))
       .sort((a, b) => {
         const d1 = parseInt(a.day.replace('Day ', ''));
         const d2 = parseInt(b.day.replace('Day ', ''));
@@ -116,7 +170,7 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
 
       {/* Main Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
+
         {/* 1. Category Distribution */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
           <h3 className="text-md font-bold text-slate-800 mb-6 flex items-center justify-between">
@@ -139,11 +193,8 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip 
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                  formatter={(value: number) => [`$${value.toLocaleString()}`, 'Total Spent']} 
-                />
-                <Legend layout="vertical" align="right" verticalAlign="middle" />
+                <Tooltip content={<CustomTooltip />} wrapperStyle={{ zIndex: 1000 }} />
+                <Legend verticalAlign="bottom" height={36} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -160,17 +211,14 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
               <AreaChart data={dailyTrendData}>
                 <defs>
                   <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1} />
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
                 <YAxis hide />
-                <Tooltip 
-                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                   formatter={(value: number) => [`$${value.toLocaleString()}`, 'Expenditure']}
-                />
+                <Tooltip content={<CustomTooltip />} wrapperStyle={{ zIndex: 1000 }} />
                 <Area type="monotone" dataKey="amount" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorAmount)" />
               </AreaChart>
             </ResponsiveContainer>
@@ -188,7 +236,7 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
               <BarChart data={merchantData} layout="vertical" margin={{ left: 20 }}>
                 <XAxis type="number" hide />
                 <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 500 }} width={120} />
-                <Tooltip cursor={{ fill: '#f8fafc' }} formatter={(value: number) => [`$${value.toLocaleString()}`, 'Amount']} />
+                <Tooltip cursor={{ fill: '#f8fafc' }} formatter={(value: number) => [`$${value.toLocaleString()}`, 'Amount']} wrapperStyle={{ zIndex: 1000 }} />
                 <Bar dataKey="value" fill="#f59e0b" radius={[0, 4, 4, 0]} barSize={20} />
               </BarChart>
             </ResponsiveContainer>
@@ -208,7 +256,7 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} />
                 <YAxis yAxisId="left" hide />
                 <YAxis yAxisId="right" orientation="right" hide />
-                <Tooltip />
+                <Tooltip content={<CustomTooltip />} wrapperStyle={{ zIndex: 1000 }} />
                 <Legend />
                 <Bar yAxisId="left" dataKey="value" name="Total Value ($)" fill="#8b5cf6" radius={[4, 4, 0, 0]} barSize={30} />
                 <Line yAxisId="right" type="monotone" dataKey="count" name="Tx Count" stroke="#ec4899" strokeWidth={2} dot={{ fill: '#ec4899' }} />
