@@ -11,6 +11,7 @@ import { classifyTransactions } from './services/geminiService';
 import { storageService } from './services/storageService';
 import { supabase } from './lib/supabase';
 import Auth from './components/Auth';
+import MonthlySpreadsheet from './components/MonthlySpreadsheet';
 import { Session } from '@supabase/supabase-js';
 
 const App: React.FC = () => {
@@ -228,6 +229,19 @@ const App: React.FC = () => {
               <FileUpload onFileSelect={handleFileUpload} disabled={status !== AppState.IDLE} />
             </div>
 
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-slate-800">Recent Reports</h3>
+              {savedReports.length > 0 && (
+                <button
+                  onClick={() => setStatus(AppState.MONTHLY_VIEW)}
+                  className="bg-slate-900 text-white px-5 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-slate-800 transition-all shadow-lg shadow-slate-200"
+                >
+                  <i className="fa-solid fa-table-list"></i>
+                  Monthly Overview
+                </button>
+              )}
+            </div>
+
             <ReportHistory
               reports={savedReports}
               onSelect={handleSelectReport}
@@ -340,6 +354,14 @@ const App: React.FC = () => {
               </button>
             </div>
             <ComparisonView reportA={currentReport} reportB={compareReport} />
+          </div>
+        )}
+        {status === AppState.MONTHLY_VIEW && (
+          <div className="animate-in fade-in slide-in-from-bottom duration-500">
+            <MonthlySpreadsheet
+              reports={savedReports}
+              onBack={() => setStatus(AppState.IDLE)}
+            />
           </div>
         )}
       </main>
