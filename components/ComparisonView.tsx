@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import { SavedReport } from '../types';
 
@@ -21,7 +21,9 @@ const ComparisonView: React.FC<ComparisonViewProps> = ({ reportA, reportB }) => 
       const totals: Record<string, number> = {};
       report.transactions.forEach(t => {
         const cat = t.category || 'Other';
-        totals[cat] = (totals[cat] || 0) + t.amount;
+        // Treat outflows as positive spending, inflows as negative offset for net spending per category
+        const val = t.amount < 0 ? Math.abs(t.amount) : -t.amount;
+        totals[cat] = (totals[cat] || 0) + val;
       });
       return totals;
     };
@@ -33,7 +35,8 @@ const ComparisonView: React.FC<ComparisonViewProps> = ({ reportA, reportB }) => 
       const valA = totalsA[cat] || 0;
       const valB = totalsB[cat] || 0;
       const diff = valB - valA;
-      const percentDiff = valA !== 0 ? (diff / valA) * 100 : 100;
+      // If spending went from 0 to something, it's 100% increase
+      const percentDiff = valA !== 0 ? (diff / Math.abs(valA)) * 100 : (valB !== 0 ? 100 : 0);
 
       return {
         category: cat,
@@ -52,7 +55,7 @@ const ComparisonView: React.FC<ComparisonViewProps> = ({ reportA, reportB }) => 
           <i className="fa-solid fa-code-compare text-indigo-500"></i>
           Spending Comparison: {reportA.name} vs {reportB.name}
         </h3>
-        
+
         <div className="h-[400px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={comparisonData} margin={{ top: 20, right: 30, left: 20, bottom: 50 }}>

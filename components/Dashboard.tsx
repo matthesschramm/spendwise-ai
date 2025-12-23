@@ -61,10 +61,22 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
-  // 1. Category Data
+  // 0. Filter and split transactions
+  const { outflows, inflows } = useMemo(() => {
+    return transactions.reduce((acc, t) => {
+      if (t.amount < 0) {
+        acc.outflows.push({ ...t, amount: Math.abs(t.amount) });
+      } else {
+        acc.inflows.push(t);
+      }
+      return acc;
+    }, { outflows: [] as Transaction[], inflows: [] as Transaction[] });
+  }, [transactions]);
+
+  // 1. Category Data (using Outflows)
   const categoryData = useMemo(() => {
     const summary: Record<string, { value: number, count: number, transactions: Transaction[] }> = {};
-    transactions.forEach(t => {
+    outflows.forEach(t => {
       const cat = t.category || "Other";
       if (!summary[cat]) summary[cat] = { value: 0, count: 0, transactions: [] };
       summary[cat].value += t.amount;
@@ -78,12 +90,12 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
       count: stats.count,
       transactions: stats.transactions.sort((a, b) => b.amount - a.amount).slice(0, 5)
     })).sort((a, b) => b.value - a.value);
-  }, [transactions]);
+  }, [outflows]);
 
   // 2. Daily Trend Data
   const dailyTrendData = useMemo(() => {
     const daily: Record<string, { amount: number, transactions: Transaction[] }> = {};
-    transactions.forEach(t => {
+    outflows.forEach(t => {
       const dateParts = t.date.split(/[-/]/);
       let day = t.date;
       if (dateParts.length >= 2) {
@@ -110,12 +122,12 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
         const d2 = parseInt(b.day.replace('Day ', ''));
         return d1 - d2;
       });
-  }, [transactions]);
+  }, [outflows]);
 
   // 3. Merchant Analysis
   const merchantData = useMemo(() => {
     const merchants: Record<string, number> = {};
-    transactions.forEach(t => {
+    outflows.forEach(t => {
       const name = t.description.split(/[0-9*#]/)[0].trim().substring(0, 20);
       merchants[name] = (merchants[name] || 0) + t.amount;
     });
@@ -123,31 +135,31 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
       .map(([name, value]) => ({ name, value: Number(value.toFixed(2)) }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 8);
-  }, [transactions]);
+  }, [outflows]);
 
-  const total = categoryData.reduce((acc, curr) => acc + curr.value, 0);
-  const maxExpense = Math.max(...transactions.map(t => t.amount));
-  const avgDaily = total / (dailyTrendData.length || 1);
-  const topCategoryPercent = total > 0 ? (categoryData[0]?.value / total) * 100 : 0;
+  const totalSpent = categoryData.reduce((acc, curr) => acc + curr.value, 0);
+  const totalIncome = inflows.reduce((acc, curr) => acc + curr.amount, 0);
+  const maxExpense = outflows.length > 0 ? Math.max(...outflows.map(t => t.amount)) : 0;
+  const topCategoryPercent = totalSpent > 0 ? (categoryData[0]?.value / totalSpent) * 100 : 0;
 
   return (
     <div className="space-y-6 mt-8">
       {/* KPI Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-blue-600 p-5 rounded-2xl text-white shadow-lg shadow-blue-100">
+        <div className="bg-red-600 p-5 rounded-2xl text-white shadow-lg shadow-red-100">
           <div className="flex justify-between items-start">
-            <p className="text-blue-100 text-xs font-bold uppercase tracking-wider">Total Spent</p>
-            <i className="fa-solid fa-wallet text-blue-300 opacity-50"></i>
+            <p className="text-red-100 text-xs font-bold uppercase tracking-wider">Total Spent</p>
+            <i className="fa-solid fa-arrow-down-long text-red-300 opacity-50"></i>
           </div>
-          <h4 className="text-2xl font-black mt-1">${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h4>
+          <h4 className="text-2xl font-black mt-1">${totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h4>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+        <div className="bg-emerald-600 p-5 rounded-2xl text-white shadow-lg shadow-emerald-100">
           <div className="flex justify-between items-start">
-            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Daily Average</p>
-            <i className="fa-solid fa-calculator text-slate-300"></i>
+            <p className="text-emerald-100 text-xs font-bold uppercase tracking-wider">Total Income</p>
+            <i className="fa-solid fa-arrow-up-long text-emerald-300 opacity-50"></i>
           </div>
-          <h4 className="text-2xl font-black text-slate-800 mt-1">${avgDaily.toLocaleString(undefined, { maximumFractionDigits: 0 })}</h4>
+          <h4 className="text-2xl font-black mt-1">${totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h4>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">

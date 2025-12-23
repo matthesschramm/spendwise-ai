@@ -82,16 +82,18 @@ const App: React.FC = () => {
   }, []);
 
   const saveCurrentAnalysis = async (customReport?: SavedReport) => {
-    if (!customReport && !reportName.trim()) return;
+    // If customReport is an Event (like from onClick), ignore it
+    const actualReport = (customReport && 'id' in customReport) ? customReport : undefined;
+    if (!actualReport && !reportName.trim()) return;
 
     setIsSaving(true);
     try {
-      const reportToSave = customReport || {
+      const reportToSave = actualReport || {
         id: `report-${Date.now()}`,
         name: reportName,
         timestamp: Date.now(),
         transactions: transactions,
-        totalSpent: transactions.reduce((acc, t) => acc + t.amount, 0)
+        totalSpent: transactions.reduce((acc, t) => acc + (t.amount < 0 ? Math.abs(t.amount) : 0), 0)
       };
 
       await storageService.saveReport(reportToSave, session!.user.id);
@@ -128,7 +130,7 @@ const App: React.FC = () => {
       setCurrentReport({
         ...currentReport,
         transactions: updatedTransactions,
-        totalSpent: updatedTransactions.reduce((acc, t) => acc + t.amount, 0)
+        totalSpent: updatedTransactions.reduce((acc, t) => acc + (t.amount < 0 ? Math.abs(t.amount) : 0), 0)
       });
     }
   };
@@ -299,7 +301,7 @@ const App: React.FC = () => {
                     className="flex-1 md:w-64 px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <button
-                    onClick={saveCurrentAnalysis}
+                    onClick={() => saveCurrentAnalysis()}
                     disabled={!reportName.trim()}
                     className="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold disabled:opacity-50 hover:bg-blue-700 transition-colors"
                   >

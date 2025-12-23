@@ -6,7 +6,7 @@ export const parseCSV = (text: string): Transaction[] => {
   if (lines.length < 2) return [];
 
   const headers = lines[0].toLowerCase().split(',').map(h => h.trim());
-  
+
   // Find column indices
   const dateIdx = headers.findIndex(h => h.includes('date'));
   const descIdx = headers.findIndex(h => h.includes('desc') || h.includes('merchant') || h.includes('transaction'));
@@ -17,7 +17,7 @@ export const parseCSV = (text: string): Transaction[] => {
   }
 
   const transactions: Transaction[] = [];
-  
+
   for (let i = 1; i < lines.length; i++) {
     const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
     if (cols.length < headers.length) continue;
@@ -29,7 +29,7 @@ export const parseCSV = (text: string): Transaction[] => {
       id: `tx-${i}-${Date.now()}`,
       date: cols[dateIdx],
       description: cols[descIdx],
-      amount: Math.abs(amount), // Transactions are usually negative on card, we treat as expenditure
+      amount: amount, // Keep sign to distinguish between inflows and outflows
     });
   }
 
