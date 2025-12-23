@@ -232,13 +232,22 @@ const App: React.FC = () => {
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold text-slate-800">Recent Reports</h3>
               {savedReports.length > 0 && (
-                <button
-                  onClick={() => setStatus(AppState.MONTHLY_VIEW)}
-                  className="bg-slate-900 text-white px-5 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-slate-800 transition-all shadow-lg shadow-slate-200"
-                >
-                  <i className="fa-solid fa-table-list"></i>
-                  Monthly Overview
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setStatus(AppState.MONTHLY_VIEW)}
+                    className="bg-slate-900 text-white px-5 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-slate-800 transition-all shadow-lg shadow-slate-200"
+                  >
+                    <i className="fa-solid fa-table-list"></i>
+                    Calendar View
+                  </button>
+                  <button
+                    onClick={() => setStatus(AppState.MID_MONTH_VIEW)}
+                    className="bg-blue-600 text-white px-5 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
+                  >
+                    <i className="fa-solid fa-calendar-day"></i>
+                    Mid-Month View (15th-14th)
+                  </button>
+                </div>
               )}
             </div>
 
@@ -361,6 +370,16 @@ const App: React.FC = () => {
             <MonthlySpreadsheet
               reports={savedReports}
               onBack={() => setStatus(AppState.IDLE)}
+              mode="calendar"
+            />
+          </div>
+        )}
+        {status === AppState.MID_MONTH_VIEW && (
+          <div className="animate-in fade-in slide-in-from-bottom duration-500">
+            <MonthlySpreadsheet
+              reports={savedReports}
+              onBack={() => setStatus(AppState.IDLE)}
+              mode="mid-month"
             />
           </div>
         )}

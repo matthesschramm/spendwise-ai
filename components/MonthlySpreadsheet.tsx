@@ -5,21 +5,20 @@ import { SavedReport, Transaction } from '../types';
 interface MonthlySpreadsheetProps {
     reports: SavedReport[];
     onBack: () => void;
+    mode?: 'calendar' | 'mid-month';
 }
 
-const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack }) => {
+const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack, mode = 'calendar' }) => {
     const tableData = useMemo(() => {
         const monthMap: Record<string, Record<string, number>> = {};
         const categories = new Set<string>();
         const incomeCategories = new Set<string>();
         const expenseCategories = new Set<string>();
-
         const globalCategoryTotals: Record<string, number> = {};
 
         reports.forEach(report => {
             report.transactions.forEach(t => {
                 // Robust date parsing: explicitly handle DD/MM/YYYY
-                // Standard new Date() can be ambiguous depending on browser locale
                 let date: Date;
                 if (t.date.includes('/')) {
                     const parts = t.date.split('/');
@@ -37,7 +36,20 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
 
                 if (isNaN(date.getTime())) return;
 
-                const monthKey = date.toLocaleString('default', { month: 'long', year: 'numeric' });
+                let monthKey: string;
+                if (mode === 'mid-month') {
+                    // 15th of month X to 14th of month X+1 is labeled "Month X"
+                    const day = date.getDate();
+                    let targetDate = new Date(date);
+                    if (day < 15) {
+                        // Belongs to the cycle that started on the 15th of previous month
+                        targetDate.setMonth(targetDate.getMonth() - 1);
+                    }
+                    monthKey = targetDate.toLocaleString('default', { month: 'long', year: 'numeric' }) + ' (Mid-Month)';
+                } else {
+                    monthKey = date.toLocaleString('default', { month: 'long', year: 'numeric' });
+                }
+
                 const cat = t.category || 'Other';
 
                 if (!monthMap[monthKey]) monthMap[monthKey] = {};
@@ -93,7 +105,14 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-black text-slate-900">Monthly Performance Table</h2>
+                <div>
+                    <h2 className="text-2xl font-black text-slate-900">
+                        Monthly Performance Table
+                    </h2>
+                    <p className="text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full w-fit mt-2">
+                        {mode === 'mid-month' ? 'Mid-Month View (15th - 14th)' : 'Standard Calendar View'}
+                    </p>
+                </div>
                 <button
                     onClick={onBack}
                     className="text-sm font-bold text-slate-500 hover:text-slate-800 flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-slate-100 transition-all"
