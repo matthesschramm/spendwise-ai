@@ -15,7 +15,7 @@ export const classifyTransactions = async (transactions: Transaction[]): Promise
 
   const systemInstruction = `
     You are an expert financial analyst. Your task is to classify credit card transactions into categories.
-    Available categories: Food & Dining, Shopping, Housing, Transportation, Utilities, Entertainment, Healthcare, Income, Travel, Insurance, Other.
+    Available categories: Food - Supermarkets, Food - Dining, Shopping, Housing, Transportation, Utilities, Entertainment, Healthcare, Income, Travel, Insurance, Other.
     
     If a merchant description is ambiguous or unknown, use your internal knowledge and the Google Search tool to identify the merchant and its business type.
     
