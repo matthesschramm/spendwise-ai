@@ -1,6 +1,76 @@
-
 import React, { useMemo } from 'react';
 import { SavedReport, Transaction } from '../types';
+
+const SpreadsheetTooltip: React.FC<{
+    title: string;
+    total: number;
+    transactions: Transaction[];
+    position: { x: number; y: number };
+}> = ({ title, total, transactions, position }) => {
+    // Breakdown totals
+    const { outflows, inflows } = transactions.reduce((acc, t) => {
+        if (t.amount < 0) acc.outflows += t.amount;
+        else acc.inflows += t.amount;
+        return acc;
+    }, { outflows: 0, inflows: 0 });
+
+    // Show top transactions by magnitude
+    const sorted = [...transactions].sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)).slice(0, 10);
+
+    return (
+        <div
+            className="fixed z-[9999] bg-white p-5 rounded-2xl shadow-2xl border border-slate-200 min-w-[320px] animate-in fade-in zoom-in duration-150 pointer-events-none"
+            style={{
+                left: Math.min(position.x + 20, window.innerWidth - 340),
+                top: Math.min(position.y + 20, window.innerHeight - 400)
+            }}
+        >
+            <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+                <span className="text-sm font-black text-slate-900">{title}</span>
+                <span className={`text-xs font-black px-2 py-1 rounded-lg ${total >= 0 ? 'text-emerald-700 bg-emerald-50' : 'text-rose-700 bg-rose-50'}`}>
+                    ${Math.abs(total).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </span>
+            </div>
+
+            {/* Net Breakdown Summary */}
+            <div className="grid grid-cols-2 gap-2 mb-4">
+                <div className="bg-rose-50/50 p-2 rounded-xl border border-rose-100/50">
+                    <p className="text-[9px] font-black text-rose-600 uppercase tracking-tighter">Total Spent</p>
+                    <p className="text-sm font-black text-rose-700">-${Math.abs(outflows).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                </div>
+                <div className="bg-emerald-50/50 p-2 rounded-xl border border-emerald-100/50">
+                    <p className="text-[9px] font-black text-emerald-600 uppercase tracking-tighter">Total In/Refund</p>
+                    <p className="text-sm font-black text-emerald-700">+${inflows.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                </div>
+            </div>
+
+            <div className="space-y-2">
+                <p className="text-[10px] uppercase font-black text-slate-400 tracking-widest mb-1">Detailed Breakdown</p>
+                <div className="max-h-[220px] overflow-y-auto pr-2 custom-scrollbar focus:outline-none">
+                    {sorted.map((t, idx) => {
+                        const isOutflow = t.amount < 0;
+                        return (
+                            <div key={t.id || idx} className="flex justify-between items-start gap-4 mb-3 last:mb-0 border-l-2 pl-3 border-transparent hover:border-slate-100 transition-colors">
+                                <div className="flex-1">
+                                    <p className="text-[11px] font-bold text-slate-700 leading-tight line-clamp-1">{t.description}</p>
+                                    <p className="text-[9px] text-slate-400 font-medium">{t.date}</p>
+                                </div>
+                                <span className={`text-[11px] font-black whitespace-nowrap ${isOutflow ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                    {isOutflow ? '-' : '+'}${Math.abs(t.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                        );
+                    })}
+                    {transactions.length > 10 && (
+                        <p className="text-[10px] text-blue-600 font-black mt-3 text-center bg-blue-50 py-1.5 rounded-lg border border-blue-100">
+                            + {transactions.length - 10} additional items
+                        </p>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
 
 interface MonthlySpreadsheetProps {
     reports: SavedReport[];
@@ -9,9 +79,19 @@ interface MonthlySpreadsheetProps {
 }
 
 const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack, mode = 'calendar' }) => {
+    const [activeTooltip, setActiveTooltip] = React.useState<{
+        title: string;
+        total: number;
+        transactions: Transaction[];
+        position: { x: number; y: number };
+    } | null>(null);
+
     const tableData = useMemo(() => {
-        const monthMap: Record<string, Record<string, number>> = {};
+        const monthMap: Record<string, Record<string, { total: number; transactions: Transaction[] }>> = {};
         const monthSortMap: Record<string, number> = {};
+        // Deduplication set to handle transactions that might exist in multiple overlapping reports
+        const seenTransactions = new Set<string>();
+
         const categories = new Set<string>();
         const incomeCategories = new Set<string>();
         const expenseCategories = new Set<string>();
@@ -19,6 +99,10 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
 
         reports.forEach(report => {
             report.transactions.forEach(t => {
+                // Deduplicate by Date + Description + Amount
+                const dupKey = `${t.date}|${t.description}|${t.amount}`;
+                if (seenTransactions.has(dupKey)) return;
+                seenTransactions.add(dupKey);
                 // Robust date parsing: explicitly handle DD/MM/YYYY
                 let date: Date;
                 if (t.date.includes('/')) {
@@ -59,7 +143,12 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                     monthSortMap[monthKey] = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1).getTime();
                 }
 
-                monthMap[monthKey][cat] = (monthMap[monthKey][cat] || 0) + t.amount;
+                if (!monthMap[monthKey][cat]) {
+                    monthMap[monthKey][cat] = { total: 0, transactions: [] };
+                }
+
+                monthMap[monthKey][cat].total += t.amount;
+                monthMap[monthKey][cat].transactions.push(t);
                 globalCategoryTotals[cat] = (globalCategoryTotals[cat] || 0) + t.amount;
                 categories.add(cat);
             });
@@ -151,9 +240,20 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                                 <tr key={cat} className="group hover:bg-slate-50 transition-colors">
                                     <td className="p-4 text-sm font-bold text-slate-700 sticky left-0 bg-white group-hover:bg-slate-50">{cat}</td>
                                     {tableData.months.map(month => {
-                                        const val = tableData.data[month][cat] || 0;
+                                        const cell = tableData.data[month][cat];
+                                        const val = cell?.total || 0;
                                         return (
-                                            <td key={month} className={`p-4 text-sm font-black text-right ${val > 0 ? 'text-emerald-600' : 'text-slate-300'}`}>
+                                            <td
+                                                key={month}
+                                                className={`p-4 text-sm font-black text-right transition-colors ${val > 0 ? 'text-emerald-600 bg-emerald-50/20 hover:bg-emerald-100/50' : 'text-slate-300'} cursor-help relative`}
+                                                onMouseEnter={(e) => val > 0 && setActiveTooltip({
+                                                    title: `${cat} - ${month}`,
+                                                    total: val,
+                                                    transactions: cell.transactions,
+                                                    position: { x: e.clientX, y: e.clientY }
+                                                })}
+                                                onMouseLeave={() => setActiveTooltip(null)}
+                                            >
                                                 {val !== 0 ? `$${val.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '-'}
                                             </td>
                                         );
@@ -163,7 +263,7 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                             <tr className="bg-emerald-50/50 font-black">
                                 <td className="p-4 text-sm text-emerald-700 sticky left-0 bg-emerald-50/50">Total Income</td>
                                 {tableData.months.map(month => {
-                                    const totalIn = tableData.incomeCategories.reduce((acc, cat) => acc + (tableData.data[month][cat] || 0), 0);
+                                    const totalIn = tableData.incomeCategories.reduce((acc, cat) => acc + (tableData.data[month][cat]?.total || 0), 0);
                                     return (
                                         <td key={month} className="p-4 text-sm text-emerald-700 text-right">
                                             ${totalIn.toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -182,10 +282,21 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                                 <tr key={cat} className="group hover:bg-slate-50 transition-colors">
                                     <td className="p-4 text-sm font-bold text-slate-700 sticky left-0 bg-white group-hover:bg-slate-50">{cat}</td>
                                     {tableData.months.map(month => {
-                                        const val = tableData.data[month][cat] || 0;
+                                        const cell = tableData.data[month][cat];
+                                        const val = cell?.total || 0;
                                         const absVal = Math.abs(val);
                                         return (
-                                            <td key={month} className={`p-4 text-sm font-black text-right ${val < 0 ? 'text-red-500' : 'text-slate-300'}`}>
+                                            <td
+                                                key={month}
+                                                className={`p-4 text-sm font-black text-right transition-colors ${val < 0 ? 'text-red-500 bg-red-50/20 hover:bg-red-100/50' : 'text-slate-300'} cursor-help relative`}
+                                                onMouseEnter={(e) => val < 0 && setActiveTooltip({
+                                                    title: `${cat} - ${month}`,
+                                                    total: val,
+                                                    transactions: cell.transactions,
+                                                    position: { x: e.clientX, y: e.clientY }
+                                                })}
+                                                onMouseLeave={() => setActiveTooltip(null)}
+                                            >
                                                 {val !== 0 ? `$${absVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '-'}
                                             </td>
                                         );
@@ -195,7 +306,7 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                             <tr className="bg-red-50/50 font-black">
                                 <td className="p-4 text-sm text-red-700 sticky left-0 bg-red-50/50">Total Expenses</td>
                                 {tableData.months.map(month => {
-                                    const totalOut = tableData.expenseCategories.reduce((acc, cat) => acc + (tableData.data[month][cat] || 0), 0);
+                                    const totalOut = tableData.expenseCategories.reduce((acc, cat) => acc + (tableData.data[month][cat]?.total || 0), 0);
                                     return (
                                         <td key={month} className="p-4 text-sm text-red-700 text-right">
                                             ${Math.abs(totalOut).toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -208,8 +319,8 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                             <tr className="bg-slate-900 text-white font-black">
                                 <td className="p-4 text-sm sticky left-0 bg-slate-900 border-r border-slate-800">Net Position</td>
                                 {tableData.months.map(month => {
-                                    const totalIn = tableData.incomeCategories.reduce((acc, cat) => acc + (tableData.data[month][cat] || 0), 0);
-                                    const totalOut = tableData.expenseCategories.reduce((acc, cat) => acc + (tableData.data[month][cat] || 0), 0);
+                                    const totalIn = tableData.incomeCategories.reduce((acc, cat) => acc + (tableData.data[month][cat]?.total || 0), 0);
+                                    const totalOut = tableData.expenseCategories.reduce((acc, cat) => acc + (tableData.data[month][cat]?.total || 0), 0);
                                     const net = totalIn + totalOut;
                                     return (
                                         <td key={month} className={`p-4 text-sm text-right ${net >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
@@ -232,11 +343,12 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                     <p className="text-blue-700 text-sm mt-1 leading-relaxed">
                         This view aggregates all transactions from your saved reports.
                         Rows are dynamically generated based on the categories found in your statement history.
-                        Outflows (negative amounts) are shown as positive numbers in the expense section for readability,
-                        while the Net Position reflects your actual bottom line.
+                        <span className="font-bold underline ml-1">Hover over any value</span> to see the top transactions contributing to that amount.
                     </p>
                 </div>
             </div>
+
+            {activeTooltip && <SpreadsheetTooltip {...activeTooltip} />}
         </div>
     );
 };
