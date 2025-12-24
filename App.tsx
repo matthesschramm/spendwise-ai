@@ -14,6 +14,35 @@ import Auth from './components/Auth';
 import MonthlySpreadsheet from './components/MonthlySpreadsheet';
 import { Session } from '@supabase/supabase-js';
 
+// New specialized components for UX 2.0
+const ProcessingBar: React.FC<{ progress: number }> = ({ progress }) => (
+  <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 p-4 animate-in slide-in-from-bottom duration-300 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+    <div className="max-w-6xl mx-auto flex items-center justify-between gap-6">
+      <div className="flex items-center gap-3">
+        <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center">
+          <i className="fa-solid fa-brain text-blue-600 animate-pulse"></i>
+        </div>
+        <div>
+          <p className="text-sm font-bold text-slate-800">AI Background Analysis</p>
+          <p className="text-xs text-slate-500">Categorizing transactions for you...</p>
+        </div>
+      </div>
+      <div className="flex-1 max-w-md">
+        <div className="flex justify-between text-xs mb-1.5 font-bold">
+          <span className="text-blue-600">{progress}%</span>
+          <span className="text-slate-400">Complete</span>
+        </div>
+        <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+          <div
+            className="bg-blue-600 h-full transition-all duration-500 ease-out"
+            style={{ width: `${progress}%` }}
+          ></div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
 const App: React.FC = () => {
   const [status, setStatus] = useState<AppState>(AppState.IDLE);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -25,6 +54,10 @@ const App: React.FC = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [showSavedFeedback, setShowSavedFeedback] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [isAnalysisComplete, setIsAnalysisComplete] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [tempReportName, setTempReportName] = useState("");
 
   // Auth listener
   useEffect(() => {
@@ -52,8 +85,11 @@ const App: React.FC = () => {
   }, [session]);
 
   const handleFileUpload = useCallback(async (csvText: string) => {
+    if (!session) return;
     setStatus(AppState.PARSING);
     setError(null);
+    setIsAnalysisComplete(false);
+    setAnalysisProgress(0);
 
     try {
       const parsedData = parseCSV(csvText);
@@ -61,26 +97,72 @@ const App: React.FC = () => {
         throw new Error("No valid transactions found in the CSV.");
       }
 
+      // 1. Create the Pending Report & Trigger Instant Autosave
+      const newReportId = `report-${Date.now()}`;
+      const defaultName = `Report ${new Date().toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}`;
+
+      const newReport: SavedReport = {
+        id: newReportId,
+        name: defaultName,
+        timestamp: Date.now(),
+        transactions: parsedData, // Initially all categorized as 'Other' by default in parser
+        totalSpent: parsedData.reduce((acc, t) => acc + (t.amount < 0 ? Math.abs(t.amount) : 0), 0),
+        status: 'processing',
+        progress: 0
+      };
+
       setTransactions(parsedData);
-      setStatus(AppState.ANALYZING);
+      setCurrentReport(newReport);
+      setSavedReports(prev => [newReport, ...prev]);
+      setStatus(AppState.COMPLETED); // We jump straight to dashboard view
 
-      const chunkSize = 20;
-      const analyzedTransactions: Transaction[] = [];
+      await storageService.saveReport(newReport, session.user.id);
 
-      for (let i = 0; i < parsedData.length; i += chunkSize) {
-        const chunk = parsedData.slice(i, i + chunkSize);
-        const classifiedChunk = await classifyTransactions(chunk);
-        analyzedTransactions.push(...classifiedChunk);
-      }
+      // 2. Start Background Analysis (Non-blocking)
+      // We use a local variable to keep track of the latest transactions list
+      // this avoids the issues with functional setStates and side-effects.
+      let currentParsedList = [...parsedData];
 
-      setTransactions(analyzedTransactions);
-      setStatus(AppState.COMPLETED);
+      classifyTransactions(parsedData, (progress, batch) => {
+        setAnalysisProgress(progress);
+
+        // Update local list
+        batch.forEach(newTx => {
+          const idx = currentParsedList.findIndex(t => t.id === newTx.id);
+          if (idx !== -1) currentParsedList[idx] = newTx;
+        });
+
+        // Create the fully updated report object
+        const latestTransactions = [...currentParsedList];
+        const updatedReport: SavedReport = {
+          ...newReport,
+          transactions: latestTransactions,
+          status: progress === 100 ? 'completed' : 'processing',
+          progress: progress
+        };
+
+        // Batch the state updates synchronously
+        setTransactions(latestTransactions);
+        setCurrentReport(updatedReport);
+        setSavedReports(prevReports =>
+          prevReports.map(r => r.id === newReportId ? updatedReport : r)
+        );
+
+        // Autosave the incremental progress to Supabase
+        storageService.saveReport(updatedReport, session.user.id);
+
+        if (progress === 100) {
+          setIsAnalysisComplete(true);
+          setTimeout(() => setIsAnalysisComplete(false), 5000);
+        }
+      });
+
     } catch (err: any) {
       console.error(err);
       setError(err.message || "An unexpected error occurred.");
       setStatus(AppState.ERROR);
     }
-  }, []);
+  }, [session]);
 
   const saveCurrentAnalysis = async (customReport?: SavedReport) => {
     // If customReport is an Event (like from onClick), ignore it
@@ -89,12 +171,14 @@ const App: React.FC = () => {
 
     setIsSaving(true);
     try {
-      const reportToSave = actualReport || {
+      const reportToSave: SavedReport = actualReport || {
         id: `report-${Date.now()}`,
         name: reportName,
         timestamp: Date.now(),
         transactions: transactions,
-        totalSpent: transactions.reduce((acc, t) => acc + (t.amount < 0 ? Math.abs(t.amount) : 0), 0)
+        totalSpent: transactions.reduce((acc, t) => acc + (t.amount < 0 ? Math.abs(t.amount) : 0), 0),
+        status: 'completed',
+        progress: 100
       };
 
       await storageService.saveReport(reportToSave, session!.user.id);
@@ -178,6 +262,35 @@ const App: React.FC = () => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     reset();
+  };
+
+  const handleRenameReport = async () => {
+    if (!currentReport || !tempReportName.trim()) {
+      setIsEditingName(false);
+      return;
+    }
+
+    const updatedReport: SavedReport = {
+      ...currentReport,
+      name: tempReportName
+    };
+
+    setCurrentReport(updatedReport);
+    setSavedReports(prev => prev.map(r => r.id === updatedReport.id ? updatedReport : r));
+    setIsEditingName(false);
+
+    try {
+      await storageService.saveReport(updatedReport, session!.user.id);
+    } catch (err) {
+      console.error('Failed to rename report:', err);
+    }
+  };
+
+  const toggleEditName = () => {
+    if (currentReport) {
+      setTempReportName(currentReport.name);
+      setIsEditingName(true);
+    }
   };
 
   if (!session) {
@@ -283,12 +396,45 @@ const App: React.FC = () => {
         {status === AppState.COMPLETED && (
           <div className="animate-in fade-in duration-500">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <div>
-                <h2 className="text-2xl font-extrabold text-slate-900">
-                  {currentReport ? currentReport.name : "New Expenditure Analysis"}
-                </h2>
+              <div className="max-w-full overflow-hidden">
+                {isEditingName ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      className="text-2xl font-extrabold text-slate-900 border-b-2 border-blue-500 bg-transparent focus:outline-none min-w-[200px]"
+                      value={tempReportName}
+                      onChange={(e) => setTempReportName(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleRenameReport()}
+                      autoFocus
+                    />
+                    <button
+                      onClick={handleRenameReport}
+                      className="text-blue-600 hover:text-blue-800 p-1"
+                    >
+                      <i className="fa-solid fa-check"></i>
+                    </button>
+                    <button
+                      onClick={() => setIsEditingName(false)}
+                      className="text-slate-400 hover:text-slate-600 p-1"
+                    >
+                      <i className="fa-solid fa-xmark"></i>
+                    </button>
+                  </div>
+                ) : (
+                  <h2
+                    className="text-2xl font-extrabold text-slate-900 cursor-pointer flex items-center gap-2 group"
+                    onClick={toggleEditName}
+                  >
+                    {currentReport ? currentReport.name : "New Expenditure Analysis"}
+                    <i className="fa-solid fa-pen text-slate-300 text-xs opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                  </h2>
+                )}
                 <div className="flex items-center gap-2">
-                  <p className="text-slate-500">Categorized by Gemini AI</p>
+                  <p className="text-slate-500">
+                    {currentReport?.status === 'processing'
+                      ? `AI Analysis in progress (${currentReport.progress}%)...`
+                      : 'Categorized by Gemini AI'}
+                  </p>
                   {currentReport && (
                     <button
                       onClick={() => saveCurrentAnalysis(currentReport)}
@@ -381,6 +527,22 @@ const App: React.FC = () => {
           </div>
         )}
       </main>
+
+      {/* UX 2.0 Global Notifications */}
+      {currentReport?.status === 'processing' && status === AppState.COMPLETED && (
+        <ProcessingBar progress={analysisProgress} />
+      )}
+
+      {isAnalysisComplete && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top duration-300">
+          <div className="bg-emerald-600 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3">
+            <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center">
+              <i className="fa-solid fa-check text-xs"></i>
+            </div>
+            <span className="text-sm font-bold">AI Analysis Complete & Autosaved</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

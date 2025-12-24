@@ -42,6 +42,8 @@ export const storageService = {
     return (data || []).map(row => {
       const report = row.data as SavedReport;
       return {
+        status: 'completed', // Default for legacy reports
+        progress: 100,      // Default for legacy reports
         ...report,
         id: row.id, // Column takes precedence
         name: row.name,

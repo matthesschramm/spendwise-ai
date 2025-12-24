@@ -18,6 +18,7 @@ const COMMON_CATEGORIES = [
   "Income",
   "Travel",
   "Insurance",
+  "Subscriptions",
   "Other"
 ];
 

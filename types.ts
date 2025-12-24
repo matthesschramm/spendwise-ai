@@ -20,6 +20,8 @@ export interface SavedReport {
   timestamp: number;
   transactions: Transaction[];
   totalSpent: number;
+  status: 'processing' | 'completed';
+  progress: number; // 0 to 100
 }
 
 export enum AppState {
