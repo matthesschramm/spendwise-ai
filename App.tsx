@@ -12,6 +12,7 @@ import { storageService } from './services/storageService';
 import { supabase } from './lib/supabase';
 import Auth from './components/Auth';
 import MonthlySpreadsheet from './components/MonthlySpreadsheet';
+import LandingPage from './components/LandingPage';
 import { Session } from '@supabase/supabase-js';
 
 // New specialized components for UX 2.0
@@ -58,6 +59,7 @@ const App: React.FC = () => {
   const [isAnalysisComplete, setIsAnalysisComplete] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempReportName, setTempReportName] = useState("");
+  const [showAuth, setShowAuth] = useState(false);
 
   // Auth listener
   useEffect(() => {
@@ -294,7 +296,10 @@ const App: React.FC = () => {
   };
 
   if (!session) {
-    return <Auth />;
+    if (showAuth) {
+      return <Auth />;
+    }
+    return <LandingPage onGetStarted={() => setShowAuth(true)} />;
   }
 
   return (
