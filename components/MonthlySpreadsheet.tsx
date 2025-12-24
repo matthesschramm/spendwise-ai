@@ -11,6 +11,7 @@ interface MonthlySpreadsheetProps {
 const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack, mode = 'calendar' }) => {
     const tableData = useMemo(() => {
         const monthMap: Record<string, Record<string, number>> = {};
+        const monthSortMap: Record<string, number> = {};
         const categories = new Set<string>();
         const incomeCategories = new Set<string>();
         const expenseCategories = new Set<string>();
@@ -36,23 +37,27 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
 
                 if (isNaN(date.getTime())) return;
 
+                let targetDate = new Date(date);
                 let monthKey: string;
+
                 if (mode === 'mid-month') {
-                    // 15th of month X to 14th of month X+1 is labeled "Month X"
-                    const day = date.getDate();
-                    let targetDate = new Date(date);
-                    if (day < 15) {
-                        // Belongs to the cycle that started on the 15th of previous month
-                        targetDate.setMonth(targetDate.getMonth() - 1);
+                    // Conventional Mid-Month: 15th of Month A to 14th of Month B is labeled "Month B"
+                    // e.g. 15 May to 14 June is "June"
+                    if (date.getDate() >= 15) {
+                        targetDate.setMonth(targetDate.getMonth() + 1);
                     }
                     monthKey = targetDate.toLocaleString('default', { month: 'long', year: 'numeric' }) + ' (Mid-Month)';
                 } else {
-                    monthKey = date.toLocaleString('default', { month: 'long', year: 'numeric' });
+                    monthKey = targetDate.toLocaleString('default', { month: 'long', year: 'numeric' });
                 }
 
                 const cat = t.category || 'Other';
 
-                if (!monthMap[monthKey]) monthMap[monthKey] = {};
+                if (!monthMap[monthKey]) {
+                    monthMap[monthKey] = {};
+                    // Use start of month for consistent sorting
+                    monthSortMap[monthKey] = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1).getTime();
+                }
 
                 monthMap[monthKey][cat] = (monthMap[monthKey][cat] || 0) + t.amount;
                 globalCategoryTotals[cat] = (globalCategoryTotals[cat] || 0) + t.amount;
@@ -78,7 +83,7 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
 
         // Sort months chronologically
         const sortedMonths = Object.keys(monthMap).sort((a, b) => {
-            return new Date(a).getTime() - new Date(b).getTime();
+            return monthSortMap[a] - monthSortMap[b];
         });
 
         return {
