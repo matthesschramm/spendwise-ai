@@ -355,47 +355,98 @@ const App: React.FC = () => {
 
       <main className="max-w-6xl mx-auto px-4 pt-10">
         {status === AppState.IDLE && (
-          <div className="max-w-4xl mx-auto">
+          <div className="max-w-5xl mx-auto">
             <div className="text-center mb-12">
               <h2 className="text-4xl font-extrabold text-slate-900 mb-4">Financial Insight Hub</h2>
-              <p className="text-lg text-slate-600 leading-relaxed">
-                Analyze your monthly statements with Gemini's AI or compare your historical spending trends.
+              <p className="text-lg text-slate-600 leading-relaxed max-w-2xl mx-auto">
+                Take control of your finances. Import new data for AI analysis or dive deep into your spending trends across time.
               </p>
             </div>
 
-            <div className="max-w-xl mx-auto mb-16">
-              <FileUpload onFileSelect={handleFileUpload} disabled={status !== AppState.IDLE} />
-            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
+              {/* Action Pillar 1: Import */}
+              <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center text-center">
+                <div className="w-24 h-24 mb-4">
+                  <img src="/import-hero.jpg" alt="Import Icon" className="w-full h-full object-contain rounded-2xl shadow-sm border border-slate-50" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-2">Direct Import</h3>
+                <p className="text-slate-500 text-sm mb-8">
+                  Upload a new CSV statement to classify transactions with Gemini AI.
+                </p>
+                <div className="w-full">
+                  <FileUpload onFileSelect={handleFileUpload} disabled={status !== AppState.IDLE} />
+                </div>
+              </div>
 
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-slate-800">Recent Reports</h3>
-              {savedReports.length > 0 && (
-                <div className="flex gap-3">
+              {/* Action Pillar 2: Analysis */}
+              <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm flex flex-col h-full">
+                <div className="flex flex-col items-center text-center flex-1">
+                  <div className="w-24 h-24 mb-4">
+                    <img src="/analysis-hero.jpg" alt="Analysis Icon" className="w-full h-full object-contain rounded-2xl shadow-sm border border-slate-50" />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-800 mb-2">Global Analysis</h3>
+                  <p className="text-slate-500 text-sm mb-8">
+                    View your entire spending history in a high-density spreadsheet format.
+                  </p>
+                </div>
+
+                <div className="space-y-4">
                   <button
                     onClick={() => setStatus(AppState.MONTHLY_VIEW)}
-                    className="bg-slate-900 text-white px-5 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-slate-800 transition-all shadow-lg shadow-slate-200"
+                    disabled={savedReports.length === 0}
+                    className="w-full group bg-slate-900 text-white p-6 rounded-2xl flex items-center justify-between hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 disabled:opacity-50 disabled:grayscale"
                   >
-                    <i className="fa-solid fa-table-list"></i>
-                    Calendar View
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i className="fa-solid fa-table-list text-slate-400"></i>
+                      </div>
+                      <div className="text-left">
+                        <p className="font-bold">Calendar View</p>
+                        <p className="text-xs text-slate-400">Standard monthly comparison</p>
+                      </div>
+                    </div>
+                    <i className="fa-solid fa-chevron-right text-slate-600 group-hover:translate-x-1 transition-transform"></i>
                   </button>
+
                   <button
                     onClick={() => setStatus(AppState.MID_MONTH_VIEW)}
-                    className="bg-blue-600 text-white px-5 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
+                    disabled={savedReports.length === 0}
+                    className="w-full group bg-blue-600 text-white p-6 rounded-2xl flex items-center justify-between hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 disabled:opacity-50 disabled:grayscale"
                   >
-                    <i className="fa-solid fa-calendar-day"></i>
-                    Mid-Month View (15th-14th)
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i className="fa-solid fa-calendar-day text-blue-200"></i>
+                      </div>
+                      <div className="text-left">
+                        <p className="font-bold">Mid-Month View</p>
+                        <p className="text-xs text-blue-200">Period: 15th to 14th</p>
+                      </div>
+                    </div>
+                    <i className="fa-solid fa-chevron-right text-blue-400 group-hover:translate-x-1 transition-transform"></i>
                   </button>
                 </div>
-              )}
+
+                {savedReports.length === 0 && (
+                  <p className="text-center text-[10px] text-slate-400 font-bold mt-4 uppercase tracking-widest">
+                    Upload a report to unlock analysis
+                  </p>
+                )}
+              </div>
             </div>
 
-            <ReportHistory
-              reports={savedReports}
-              onSelect={handleSelectReport}
-              onDelete={handleDeleteReport}
-              onCompare={handleCompareTrigger}
-              selectedForComparison={currentReport?.id || null}
-            />
+            <div className="pt-12 border-t border-slate-100">
+              <div className="flex items-center gap-2 mb-8">
+                <i className="fa-solid fa-clock-rotate-left text-slate-400"></i>
+                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Recent Reports</h3>
+              </div>
+              <ReportHistory
+                reports={savedReports}
+                onSelect={handleSelectReport}
+                onDelete={handleDeleteReport}
+                onCompare={handleCompareTrigger}
+                selectedForComparison={currentReport?.id || null}
+              />
+            </div>
           </div>
         )}
 
