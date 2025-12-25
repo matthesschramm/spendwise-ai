@@ -10,8 +10,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
             {/* Navigation Pre-Header */}
             <nav className="max-w-7xl mx-auto px-6 py-8 flex items-center justify-between relative z-20">
                 <div className="flex items-center gap-2">
-                    <img src="/logo.jpg" alt="SpendWise Logo" className="h-10 w-auto object-contain rounded-lg" />
-                    <span className="text-xl font-black text-slate-900 tracking-tighter uppercase">SpendWise AI</span>
+                    <img src="/logo-new.jpg" alt="SpendWise Logo" className="h-20 w-auto object-contain rounded-xl" />
                 </div>
                 <button
                     onClick={onGetStarted}
@@ -59,7 +58,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
                         <div className="absolute -inset-4 bg-gradient-to-tr from-blue-500 to-emerald-400 rounded-[3rem] blur-2xl opacity-10"></div>
                         <div className="relative rounded-[2.5rem] overflow-hidden shadow-2xl border-4 border-white">
                             <img
-                                src="/hero.png"
+                                src="/hero-character.jpg"
                                 alt=" SpendWise AI Dashboard"
                                 className="w-full h-auto object-cover transform hover:scale-105 transition-transform duration-700"
                             />
@@ -148,9 +147,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
 
             {/* Footer */}
             <footer className="max-w-7xl mx-auto px-6 py-12 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6 text-slate-400 font-medium text-sm">
-                <div className="flex items-center gap-2 grayscale brightness-50 contrast-125">
-                    <img src="/logo.jpg" alt="Logo" className="h-6 w-auto opacity-50" />
-                    <span className="font-bold tracking-tight">SPENDWISE AI</span>
+                <div className="flex items-center gap-2 grayscale brightness-75 contrast-125">
+                    <img src="/logo-new.jpg" alt="Logo" className="h-10 w-auto opacity-80 rounded-lg" />
                 </div>
                 <div className="flex gap-8">
                     <a href="#" className="hover:text-slate-600">Privacy Policy</a>
