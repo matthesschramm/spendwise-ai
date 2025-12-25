@@ -60,6 +60,7 @@ const App: React.FC = () => {
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempReportName, setTempReportName] = useState("");
   const [showAuth, setShowAuth] = useState(false);
+  const [currentBudget, setCurrentBudget] = useState<number>(0);
 
   // Auth listener
   useEffect(() => {
@@ -229,7 +230,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSelectReport = (report: SavedReport) => {
+  const handleSelectReport = async (report: SavedReport) => {
     console.log(`Selecting report: ${report.name}`, report);
     if (!report.transactions || report.transactions.length === 0) {
       console.warn('Report has no transactions:', report);
@@ -238,6 +239,21 @@ const App: React.FC = () => {
     setTransactions(report.transactions || []);
     setStatus(AppState.COMPLETED);
     setCompareReport(null);
+
+    if (session) {
+      const budget = await storageService.getBudget(session.user.id, report.name);
+      setCurrentBudget(budget);
+    }
+  };
+
+  const handleUpdateBudget = async (amount: number) => {
+    if (!session || !currentReport) return;
+    try {
+      await storageService.saveBudget(session.user.id, currentReport.name, amount);
+      setCurrentBudget(amount);
+    } catch (err) {
+      console.error('Failed to update budget:', err);
+    }
   };
 
   const handleDeleteReport = async (id: string) => {
@@ -489,7 +505,11 @@ const App: React.FC = () => {
               )}
             </div>
 
-            <Dashboard transactions={transactions} />
+            <Dashboard
+              transactions={transactions}
+              budgetAmount={currentBudget}
+              onUpdateBudget={handleUpdateBudget}
+            />
             <TransactionList
               transactions={transactions}
               onEditCategory={handleEditTransactionCategory}
@@ -526,6 +546,7 @@ const App: React.FC = () => {
               reports={savedReports}
               onBack={() => setStatus(AppState.IDLE)}
               mode="calendar"
+              userId={session?.user?.id}
             />
           </div>
         )}
@@ -535,6 +556,7 @@ const App: React.FC = () => {
               reports={savedReports}
               onBack={() => setStatus(AppState.IDLE)}
               mode="mid-month"
+              userId={session?.user?.id}
             />
           </div>
         )}

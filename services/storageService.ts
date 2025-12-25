@@ -94,5 +94,76 @@ export const storageService = {
     }
 
     return data || [];
+  },
+
+  saveBudget: async (userId: string, monthKey: string, amount: number, category: string = 'Total'): Promise<void> => {
+    const { error } = await supabase
+      .from('user_budgets')
+      .upsert([
+        {
+          user_id: userId,
+          month_key: monthKey,
+          category: category,
+          budget_amount: amount,
+          updated_at: new Date().toISOString()
+        }
+      ], { onConflict: 'user_id,month_key,category' });
+
+    if (error) {
+      console.error('Error saving budget:', error);
+      throw error;
+    }
+  },
+
+  getBudget: async (userId: string, monthKey: string, category: string = 'Total'): Promise<number> => {
+    const { data, error } = await supabase
+      .from('user_budgets')
+      .select('budget_amount')
+      .eq('user_id', userId)
+      .eq('month_key', monthKey)
+      .eq('category', category)
+      .single();
+
+    if (error) {
+      // It's normal for a budget to not exist yet
+      if (error.code !== 'PGRST116') {
+        console.error('Error fetching budget:', error);
+      }
+      return 0;
+    }
+
+    return data?.budget_amount || 0;
+  },
+
+  getCategoryBudgets: async (userId: string, monthKey: string): Promise<Record<string, number>> => {
+    const { data, error } = await supabase
+      .from('user_budgets')
+      .select('category, budget_amount')
+      .eq('user_id', userId)
+      .eq('month_key', monthKey);
+
+    if (error) {
+      console.error('Error fetching category budgets:', error);
+      return {};
+    }
+
+    return (data || []).reduce((acc: Record<string, number>, row: any) => {
+      acc[row.category] = row.budget_amount;
+      return acc;
+    }, {});
+  },
+
+  getAllBudgets: async (userId: string): Promise<any[]> => {
+    const { data, error } = await supabase
+      .from('user_budgets')
+      .select('*')
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('Error fetching all budgets:', error);
+      return [];
+    }
+
+    return data || [];
   }
 };

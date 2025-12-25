@@ -9,6 +9,8 @@ import { Transaction } from '../types';
 
 interface DashboardProps {
   transactions: Transaction[];
+  budgetAmount: number;
+  onUpdateBudget: (amount: number) => void;
 }
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#64748b', '#22d3ee', '#fb923c', '#4ade80'];
@@ -60,7 +62,14 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
+const Dashboard: React.FC<DashboardProps> = ({ transactions, budgetAmount, onUpdateBudget }) => {
+  const [isEditingBudget, setIsEditingBudget] = React.useState(false);
+  const [budgetInput, setBudgetInput] = React.useState(budgetAmount.toString());
+
+  // Update input if prop changes
+  React.useEffect(() => {
+    setBudgetInput(budgetAmount.toString());
+  }, [budgetAmount]);
   // 0. Filter and split transactions
   const { outflows, inflows } = useMemo(() => {
     return transactions.reduce((acc, t) => {
@@ -196,13 +205,78 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
           <h4 className="text-2xl font-black text-slate-800 mt-1">${maxExpense.toLocaleString()}</h4>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-          <div className="flex justify-between items-start">
-            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Budget Concentration</p>
-            <i className="fa-solid fa-percentage text-slate-300"></i>
+        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm relative group overflow-hidden">
+          <div className="flex justify-between items-start relative z-10">
+            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Monthly Budget</p>
+            <button
+              onClick={() => setIsEditingBudget(true)}
+              className="text-slate-300 hover:text-blue-500 transition-colors"
+            >
+              <i className="fa-solid fa-pen-to-square"></i>
+            </button>
           </div>
-          <h4 className="text-2xl font-black text-slate-800 mt-1">{topCategoryPercent.toFixed(0)}%</h4>
-          <p className="text-[10px] text-slate-400 mt-1 font-medium italic">In {categoryData[0]?.name}</p>
+
+          {isEditingBudget ? (
+            <div className="mt-2 flex gap-2 relative z-10">
+              <input
+                type="number"
+                value={budgetInput}
+                onChange={(e) => setBudgetInput(e.target.value)}
+                autoFocus
+                className="w-full bg-slate-50 border border-blue-100 rounded-lg px-3 py-1 text-lg font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    onUpdateBudget(Number(budgetInput));
+                    setIsEditingBudget(false);
+                  }
+                  if (e.key === 'Escape') {
+                    setBudgetInput(budgetAmount.toString());
+                    setIsEditingBudget(false);
+                  }
+                }}
+              />
+              <button
+                onClick={() => {
+                  onUpdateBudget(Number(budgetInput));
+                  setIsEditingBudget(false);
+                }}
+                className="bg-blue-600 text-white px-3 py-1 rounded-lg text-sm font-bold"
+              >
+                Save
+              </button>
+            </div>
+          ) : (
+            <>
+              <h4 className="text-2xl font-black text-slate-800 mt-1 relative z-10">
+                {budgetAmount > 0 ? `$${budgetAmount.toLocaleString()}` : <span className="text-slate-300">Not Set</span>}
+              </h4>
+              {budgetAmount > 0 && (
+                <div className="mt-3 relative z-10">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[10px] font-black text-slate-400 uppercase">
+                      {Math.min(100, (totalSpent / budgetAmount) * 100).toFixed(0)}% Used
+                    </span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase">
+                      ${Math.max(0, budgetAmount - totalSpent).toLocaleString()} Left
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-500 ${(totalSpent / budgetAmount) > 1 ? 'bg-rose-500' :
+                          (totalSpent / budgetAmount) > 0.8 ? 'bg-amber-500' : 'bg-emerald-500'
+                        }`}
+                      style={{ width: `${Math.min(100, (totalSpent / budgetAmount) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Background emphasis when over budget */}
+          {budgetAmount > 0 && totalSpent > budgetAmount && (
+            <div className="absolute inset-0 bg-rose-50/30 -z-0 opacity-50" />
+          )}
         </div>
       </div>
 

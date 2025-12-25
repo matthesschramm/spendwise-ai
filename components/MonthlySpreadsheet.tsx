@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { SavedReport, Transaction } from '../types';
+import { storageService } from '../services/storageService';
 
 const SpreadsheetTooltip: React.FC<{
     title: string;
@@ -76,15 +77,35 @@ interface MonthlySpreadsheetProps {
     reports: SavedReport[];
     onBack: () => void;
     mode?: 'calendar' | 'mid-month';
+    userId?: string;
 }
 
-const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack, mode = 'calendar' }) => {
+const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack, mode = 'calendar', userId }) => {
     const [activeTooltip, setActiveTooltip] = React.useState<{
         title: string;
         total: number;
         transactions: Transaction[];
         position: { x: number; y: number };
     } | null>(null);
+    const [categoryBudgets, setCategoryBudgets] = React.useState<Record<string, number>>({});
+    const [editingCategory, setEditingCategory] = React.useState<string | null>(null);
+    const [editValue, setEditValue] = React.useState("");
+
+    React.useEffect(() => {
+        if (userId) {
+            storageService.getCategoryBudgets(userId, 'Global')
+                .then(setCategoryBudgets);
+        }
+    }, [userId]);
+
+    const handleBudgetChange = async (category: string, value: string) => {
+        const amount = parseFloat(value) || 0;
+        if (userId) {
+            await storageService.saveBudget(userId, 'Global', amount, category);
+            setCategoryBudgets(prev => ({ ...prev, [category]: amount }));
+        }
+        setEditingCategory(null);
+    };
 
     const tableData = useMemo(() => {
         const monthMap: Record<string, Record<string, { total: number; transactions: Transaction[] }>> = {};
@@ -221,7 +242,8 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                     <table className="w-full text-left border-collapse min-w-[1000px]">
                         <thead className="sticky top-0 z-30">
                             <tr className="bg-slate-50 border-b border-slate-100">
-                                <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest sticky left-0 top-0 bg-slate-50 z-40 w-64 shadow-[1px_0_0_0_#f1f5f9]">Category</th>
+                                <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest sticky left-0 top-0 bg-slate-50 z-40 min-w-[256px] max-w-[256px] shadow-[1px_0_0_0_#f1f5f9]">Category</th>
+                                <th className="p-4 text-xs font-black text-blue-600 uppercase tracking-widest sticky left-[256px] top-0 bg-blue-50 z-30 min-w-[128px] max-w-[128px] border-r border-blue-100 shadow-[1px_0_0_0_#f1f5f9]">Target Budget</th>
                                 {tableData.months.map(month => (
                                     <th key={month} className="p-4 text-xs font-black text-slate-600 uppercase tracking-widest text-right whitespace-nowrap min-w-[140px] sticky top-0 bg-slate-50 z-20">
                                         {month}
@@ -232,13 +254,33 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                         <tbody className="divide-y divide-slate-50">
                             {/* Income Section */}
                             <tr className="bg-emerald-50/30">
-                                <td colSpan={tableData.months.length + 1} className="px-4 py-2 text-[10px] font-black text-emerald-600 uppercase tracking-tighter">
+                                <td colSpan={tableData.months.length + 2} className="px-4 py-2 text-[10px] font-black text-emerald-600 uppercase tracking-tighter">
                                     Income Streams
                                 </td>
                             </tr>
                             {tableData.incomeCategories.map(cat => (
                                 <tr key={cat} className="group hover:bg-slate-50 transition-colors">
-                                    <td className="p-4 text-sm font-bold text-slate-700 sticky left-0 bg-white group-hover:bg-slate-50 z-10 shadow-[1px_0_0_0_#f1f5f9]">{cat}</td>
+                                    <td className="p-4 text-sm font-bold text-slate-700 sticky left-0 bg-white group-hover:bg-slate-50 z-10 min-w-[256px] max-w-[256px] shadow-[1px_0_0_0_#f1f5f9] truncate">{cat}</td>
+                                    <td className="p-4 text-sm font-black text-emerald-600 sticky left-[256px] bg-emerald-50 z-10 border-r border-emerald-100 min-w-[128px] max-w-[128px] text-center shadow-[1px_0_0_0_#f1f5f9]">
+                                        {editingCategory === cat ? (
+                                            <input
+                                                autoFocus
+                                                type="number"
+                                                className="w-full px-1 py-0.5 text-xs border rounded bg-white"
+                                                value={editValue}
+                                                onChange={(e) => setEditValue(e.target.value)}
+                                                onBlur={() => handleBudgetChange(cat, editValue)}
+                                                onKeyDown={(e) => e.key === 'Enter' && handleBudgetChange(cat, editValue)}
+                                            />
+                                        ) : (
+                                            <div
+                                                className="cursor-pointer hover:bg-emerald-100/50 rounded px-1 transition-all"
+                                                onClick={() => { setEditingCategory(cat); setEditValue((categoryBudgets[cat] || 0).toString()); }}
+                                            >
+                                                ${(categoryBudgets[cat] || 0).toLocaleString()}
+                                            </div>
+                                        )}
+                                    </td>
                                     {tableData.months.map(month => {
                                         const cell = tableData.data[month][cat];
                                         const val = cell?.total || 0;
@@ -260,8 +302,11 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                                     })}
                                 </tr>
                             ))}
-                            <tr className="bg-emerald-50/50 font-black">
-                                <td className="p-4 text-sm text-emerald-700 sticky left-0 bg-emerald-50/50 z-10 shadow-[1px_0_0_0_#f1f5f9]">Total Income</td>
+                            <tr className="bg-emerald-50 font-black">
+                                <td className="p-4 text-sm text-emerald-700 sticky left-0 bg-emerald-50 z-10 min-w-[256px] max-w-[256px] shadow-[1px_0_0_0_#f1f5f9]">Total Income</td>
+                                <td className="p-4 text-sm text-emerald-700 sticky left-[256px] bg-emerald-50 z-10 border-r border-emerald-100 min-w-[128px] max-w-[128px] text-center shadow-[1px_0_0_0_#f1f5f9]">
+                                    ${tableData.incomeCategories.reduce((acc, cat) => acc + (categoryBudgets[cat] || 0), 0).toLocaleString()}
+                                </td>
                                 {tableData.months.map(month => {
                                     const totalIn = tableData.incomeCategories.reduce((acc, cat) => acc + (tableData.data[month][cat]?.total || 0), 0);
                                     return (
@@ -274,17 +319,40 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
 
                             {/* Expenses Section */}
                             <tr className="bg-red-50/30">
-                                <td colSpan={tableData.months.length + 1} className="px-4 py-2 text-[10px] font-black text-red-600 uppercase tracking-tighter">
+                                <td colSpan={tableData.months.length + 2} className="px-4 py-2 text-[10px] font-black text-red-600 uppercase tracking-tighter">
                                     Expense Categories
                                 </td>
                             </tr>
                             {tableData.expenseCategories.map(cat => (
                                 <tr key={cat} className="group hover:bg-slate-50 transition-colors">
-                                    <td className="p-4 text-sm font-bold text-slate-700 sticky left-0 bg-white group-hover:bg-slate-50 z-10 shadow-[1px_0_0_0_#f1f5f9]">{cat}</td>
+                                    <td className="p-4 text-sm font-bold text-slate-700 sticky left-0 bg-white group-hover:bg-slate-50 z-10 min-w-[256px] max-w-[256px] shadow-[1px_0_0_0_#f1f5f9] truncate">{cat}</td>
+                                    <td className="p-4 text-sm font-black text-rose-600 sticky left-[256px] bg-rose-50 z-10 border-r border-rose-100 min-w-[128px] max-w-[128px] text-center shadow-[1px_0_0_0_#f1f5f9]">
+                                        {editingCategory === cat ? (
+                                            <input
+                                                autoFocus
+                                                type="number"
+                                                className="w-full px-1 py-0.5 text-xs border rounded bg-white"
+                                                value={editValue}
+                                                onChange={(e) => setEditValue(e.target.value)}
+                                                onBlur={() => handleBudgetChange(cat, editValue)}
+                                                onKeyDown={(e) => e.key === 'Enter' && handleBudgetChange(cat, editValue)}
+                                            />
+                                        ) : (
+                                            <div
+                                                className="cursor-pointer hover:bg-rose-100/50 rounded px-1 transition-all"
+                                                onClick={() => { setEditingCategory(cat); setEditValue((categoryBudgets[cat] || 0).toString()); }}
+                                            >
+                                                ${(categoryBudgets[cat] || 0).toLocaleString()}
+                                            </div>
+                                        )}
+                                    </td>
                                     {tableData.months.map(month => {
                                         const cell = tableData.data[month][cat];
                                         const val = cell?.total || 0;
                                         const absVal = Math.abs(val);
+                                        const budget = categoryBudgets[cat] || 0;
+                                        const isOver = budget > 0 && absVal > budget;
+
                                         return (
                                             <td
                                                 key={month}
@@ -297,14 +365,20 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                                                 })}
                                                 onMouseLeave={() => setActiveTooltip(null)}
                                             >
-                                                {val !== 0 ? `$${absVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '-'}
+                                                <div className="flex items-center justify-end gap-1.5">
+                                                    {isOver && <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />}
+                                                    {val !== 0 ? `$${absVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '-'}
+                                                </div>
                                             </td>
                                         );
                                     })}
                                 </tr>
                             ))}
-                            <tr className="bg-red-50/50 font-black">
-                                <td className="p-4 text-sm text-red-700 sticky left-0 bg-red-50/50 z-10 shadow-[1px_0_0_0_#f1f5f9]">Total Expenses</td>
+                            <tr className="bg-red-50 font-black">
+                                <td className="p-4 text-sm text-red-700 sticky left-0 bg-red-50 z-10 min-w-[256px] max-w-[256px] shadow-[1px_0_0_0_#f1f5f9]">Total Expenses</td>
+                                <td className="p-4 text-sm text-red-700 sticky left-[256px] bg-red-50 z-10 border-r border-rose-100 min-w-[128px] max-w-[128px] text-center shadow-[1px_0_0_0_#f1f5f9]">
+                                    ${tableData.expenseCategories.reduce((acc, cat) => acc + (categoryBudgets[cat] || 0), 0).toLocaleString()}
+                                </td>
                                 {tableData.months.map(month => {
                                     const totalOut = tableData.expenseCategories.reduce((acc, cat) => acc + (tableData.data[month][cat]?.total || 0), 0);
                                     return (
@@ -317,7 +391,10 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
 
                             {/* Net Flow Section */}
                             <tr className="bg-slate-900 text-white font-black">
-                                <td className="p-4 text-sm sticky left-0 bg-slate-900 border-r border-slate-800 z-10">Net Position</td>
+                                <td className="p-4 text-sm sticky left-0 bg-slate-900 z-10 min-w-[256px] max-w-[256px] border-r border-slate-800">Net Position</td>
+                                <td className="p-4 text-sm sticky left-[256px] bg-slate-800 z-10 text-center border-r border-slate-700 min-w-[128px] max-w-[128px] shadow-[1px_0_0_0_#1e293b]">
+                                    ${(tableData.incomeCategories.reduce((acc, cat) => acc + (categoryBudgets[cat] || 0), 0) - tableData.expenseCategories.reduce((acc, cat) => acc + (categoryBudgets[cat] || 0), 0)).toLocaleString()}
+                                </td>
                                 {tableData.months.map(month => {
                                     const totalIn = tableData.incomeCategories.reduce((acc, cat) => acc + (tableData.data[month][cat]?.total || 0), 0);
                                     const totalOut = tableData.expenseCategories.reduce((acc, cat) => acc + (tableData.data[month][cat]?.total || 0), 0);
