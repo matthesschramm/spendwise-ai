@@ -1,12 +1,20 @@
 
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { Transaction, GroundingSource } from "../types";
+import { storageService } from "./storageService";
 
 export const classifyTransactions = async (
   transactions: Transaction[],
+  userId: string,
   onProgress?: (progress: number, classifiedBatch: Transaction[]) => void
 ): Promise<Transaction[]> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+
+  // 1. Fetch User Rules for the Learning Loop
+  const userRules = userId ? await storageService.getUserRules(userId) : [];
+  const rulesContext = userRules.length > 0
+    ? `\nIMPORTANT: The user has previously specified these category preferences. Use them as the absolute gold standard for these merchants: ${JSON.stringify(userRules.map(r => ({ merchant: r.merchant_pattern, preferred_category: r.preferred_category })))}`
+    : "";
 
   const BATCH_SIZE = 50;
   const totalTransactions = transactions.length;
@@ -32,6 +40,7 @@ export const classifyTransactions = async (
             Available categories: Food - Supermarkets, Food - Dining, Shopping, Housing, Transportation, Utilities, Entertainment, Healthcare, Income, Travel, Insurance, Subscriptions, Other.
             
             If a merchant description is ambiguous or unknown, use your internal knowledge and the Google Search tool to identify the merchant and its business type.
+            ${rulesContext}
             
             Return the result as a JSON array of objects, each with 'id' and 'category'.
             Only return valid JSON.

@@ -62,5 +62,37 @@ export const storageService = {
     if (error) {
       console.error('Error deleting report from Supabase:', error);
     }
+  },
+
+  saveUserRule: async (userId: string, merchant: string, category: string): Promise<void> => {
+    const { error } = await supabase
+      .from('user_rules')
+      .upsert([
+        {
+          user_id: userId,
+          merchant_pattern: merchant.trim(),
+          preferred_category: category,
+          created_at: new Date().toISOString()
+        }
+      ], { onConflict: 'user_id,merchant_pattern' });
+
+    if (error) {
+      console.error('Error saving user rule:', error);
+      throw error;
+    }
+  },
+
+  getUserRules: async (userId: string): Promise<any[]> => {
+    const { data, error } = await supabase
+      .from('user_rules')
+      .select('*')
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('Error fetching user rules:', error);
+      return [];
+    }
+
+    return data || [];
   }
 };

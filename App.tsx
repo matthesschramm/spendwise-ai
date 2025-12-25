@@ -125,7 +125,7 @@ const App: React.FC = () => {
       // this avoids the issues with functional setStates and side-effects.
       let currentParsedList = [...parsedData];
 
-      classifyTransactions(parsedData, (progress, batch) => {
+      classifyTransactions(parsedData, session.user.id, (progress, batch) => {
         setAnalysisProgress(progress);
 
         // Update local list
@@ -207,6 +207,7 @@ const App: React.FC = () => {
   };
 
   const handleEditTransactionCategory = (txId: string, newCategory: string) => {
+    const transaction = transactions.find(t => t.id === txId);
     const updatedTransactions = transactions.map(t =>
       t.id === txId ? { ...t, category: newCategory } : t
     );
@@ -219,6 +220,12 @@ const App: React.FC = () => {
         transactions: updatedTransactions,
         totalSpent: updatedTransactions.reduce((acc, t) => acc + (t.amount < 0 ? Math.abs(t.amount) : 0), 0)
       });
+    }
+
+    // SpendWise Learning Loop: Persist this preference to Supabase
+    if (session && transaction) {
+      storageService.saveUserRule(session.user.id, transaction.description, newCategory)
+        .catch(err => console.error('Failed to save learning rule:', err));
     }
   };
 
