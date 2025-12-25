@@ -216,14 +216,14 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                 </button>
             </div>
 
-            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse min-w-[800px]">
-                        <thead>
+            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden border-separate">
+                <div className="overflow-auto max-h-[80vh] custom-scrollbar focus:outline-none">
+                    <table className="w-full text-left border-collapse min-w-[1000px]">
+                        <thead className="sticky top-0 z-30">
                             <tr className="bg-slate-50 border-b border-slate-100">
-                                <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest sticky left-0 bg-slate-50 z-10 w-64">Category</th>
+                                <th className="p-4 text-xs font-black text-slate-400 uppercase tracking-widest sticky left-0 top-0 bg-slate-50 z-40 w-64 shadow-[1px_0_0_0_#f1f5f9]">Category</th>
                                 {tableData.months.map(month => (
-                                    <th key={month} className="p-4 text-xs font-black text-slate-600 uppercase tracking-widest text-right whitespace-nowrap min-w-[140px]">
+                                    <th key={month} className="p-4 text-xs font-black text-slate-600 uppercase tracking-widest text-right whitespace-nowrap min-w-[140px] sticky top-0 bg-slate-50 z-20">
                                         {month}
                                     </th>
                                 ))}
@@ -238,7 +238,7 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                             </tr>
                             {tableData.incomeCategories.map(cat => (
                                 <tr key={cat} className="group hover:bg-slate-50 transition-colors">
-                                    <td className="p-4 text-sm font-bold text-slate-700 sticky left-0 bg-white group-hover:bg-slate-50">{cat}</td>
+                                    <td className="p-4 text-sm font-bold text-slate-700 sticky left-0 bg-white group-hover:bg-slate-50 z-10 shadow-[1px_0_0_0_#f1f5f9]">{cat}</td>
                                     {tableData.months.map(month => {
                                         const cell = tableData.data[month][cat];
                                         const val = cell?.total || 0;
@@ -261,7 +261,7 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                                 </tr>
                             ))}
                             <tr className="bg-emerald-50/50 font-black">
-                                <td className="p-4 text-sm text-emerald-700 sticky left-0 bg-emerald-50/50">Total Income</td>
+                                <td className="p-4 text-sm text-emerald-700 sticky left-0 bg-emerald-50/50 z-10 shadow-[1px_0_0_0_#f1f5f9]">Total Income</td>
                                 {tableData.months.map(month => {
                                     const totalIn = tableData.incomeCategories.reduce((acc, cat) => acc + (tableData.data[month][cat]?.total || 0), 0);
                                     return (
@@ -280,7 +280,7 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                             </tr>
                             {tableData.expenseCategories.map(cat => (
                                 <tr key={cat} className="group hover:bg-slate-50 transition-colors">
-                                    <td className="p-4 text-sm font-bold text-slate-700 sticky left-0 bg-white group-hover:bg-slate-50">{cat}</td>
+                                    <td className="p-4 text-sm font-bold text-slate-700 sticky left-0 bg-white group-hover:bg-slate-50 z-10 shadow-[1px_0_0_0_#f1f5f9]">{cat}</td>
                                     {tableData.months.map(month => {
                                         const cell = tableData.data[month][cat];
                                         const val = cell?.total || 0;
@@ -304,7 +304,7 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                                 </tr>
                             ))}
                             <tr className="bg-red-50/50 font-black">
-                                <td className="p-4 text-sm text-red-700 sticky left-0 bg-red-50/50">Total Expenses</td>
+                                <td className="p-4 text-sm text-red-700 sticky left-0 bg-red-50/50 z-10 shadow-[1px_0_0_0_#f1f5f9]">Total Expenses</td>
                                 {tableData.months.map(month => {
                                     const totalOut = tableData.expenseCategories.reduce((acc, cat) => acc + (tableData.data[month][cat]?.total || 0), 0);
                                     return (
@@ -317,7 +317,7 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
 
                             {/* Net Flow Section */}
                             <tr className="bg-slate-900 text-white font-black">
-                                <td className="p-4 text-sm sticky left-0 bg-slate-900 border-r border-slate-800">Net Position</td>
+                                <td className="p-4 text-sm sticky left-0 bg-slate-900 border-r border-slate-800 z-10">Net Position</td>
                                 {tableData.months.map(month => {
                                     const totalIn = tableData.incomeCategories.reduce((acc, cat) => acc + (tableData.data[month][cat]?.total || 0), 0);
                                     const totalOut = tableData.expenseCategories.reduce((acc, cat) => acc + (tableData.data[month][cat]?.total || 0), 0);
