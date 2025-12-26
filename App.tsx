@@ -418,18 +418,18 @@ const App: React.FC = () => {
                   <button
                     onClick={() => setShowPeriodSelector(!showPeriodSelector)}
                     disabled={savedReports.length === 0}
-                    className="w-full group bg-blue-600 text-white p-6 rounded-2xl flex items-center justify-between hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 disabled:opacity-50"
+                    className="w-full group bg-indigo-50 text-indigo-900 border border-indigo-100 p-6 rounded-2xl flex items-center justify-between hover:bg-indigo-100 transition-all shadow-sm disabled:opacity-50"
                   >
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <i className="fa-solid fa-chart-line text-blue-200"></i>
+                      <div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i className="fa-solid fa-chart-line text-white"></i>
                       </div>
                       <div className="text-left">
-                        <p className="font-bold">View Period Dashboard</p>
-                        <p className="text-xs text-blue-200">Aggregated cross-report summary</p>
+                        <p className="font-bold text-indigo-900">View Period Dashboard</p>
+                        <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Aggregated Analysis</p>
                       </div>
                     </div>
-                    <i className={`fa-solid fa-chevron-${showPeriodSelector ? 'down' : 'right'} text-blue-400 transition-transform`}></i>
+                    <i className={`fa-solid fa-chevron-${showPeriodSelector ? 'down' : 'right'} text-indigo-300 transition-transform`}></i>
                   </button>
 
                   {showPeriodSelector && (
@@ -467,35 +467,35 @@ const App: React.FC = () => {
                   <button
                     onClick={() => setStatus(AppState.MONTHLY_VIEW)}
                     disabled={savedReports.length === 0}
-                    className="w-full group bg-slate-900 text-white p-6 rounded-2xl flex items-center justify-between hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 disabled:opacity-50 disabled:grayscale"
+                    className="w-full group bg-emerald-50 text-emerald-900 border border-emerald-100 p-6 rounded-2xl flex items-center justify-between hover:bg-emerald-100 transition-all shadow-sm disabled:opacity-50 disabled:grayscale"
                   >
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <i className="fa-solid fa-table-list text-slate-400"></i>
+                      <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i className="fa-solid fa-table-list text-white"></i>
                       </div>
                       <div className="text-left">
-                        <p className="font-bold">Calendar View</p>
-                        <p className="text-xs text-slate-400">Standard monthly comparison</p>
+                        <p className="font-bold text-emerald-900">Calendar View</p>
+                        <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Monthly Comparison</p>
                       </div>
                     </div>
-                    <i className="fa-solid fa-chevron-right text-slate-600 group-hover:translate-x-1 transition-transform"></i>
+                    <i className="fa-solid fa-chevron-right text-emerald-300 group-hover:translate-x-1 transition-transform"></i>
                   </button>
 
                   <button
                     onClick={() => setStatus(AppState.MID_MONTH_VIEW)}
                     disabled={savedReports.length === 0}
-                    className="w-full group bg-blue-600 text-white p-6 rounded-2xl flex items-center justify-between hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 disabled:opacity-50 disabled:grayscale"
+                    className="w-full group bg-amber-50 text-amber-900 border border-amber-100 p-6 rounded-2xl flex items-center justify-between hover:bg-amber-100 transition-all shadow-sm disabled:opacity-50 disabled:grayscale"
                   >
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <i className="fa-solid fa-calendar-day text-blue-200"></i>
+                      <div className="w-10 h-10 bg-amber-400 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i className="fa-solid fa-calendar-day text-white"></i>
                       </div>
                       <div className="text-left">
-                        <p className="font-bold">Mid-Month View</p>
-                        <p className="text-xs text-blue-200">Period: 15th to 14th</p>
+                        <p className="font-bold text-amber-900">Mid-Month View</p>
+                        <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">15th to 14th Cycle</p>
                       </div>
                     </div>
-                    <i className="fa-solid fa-chevron-right text-blue-400 group-hover:translate-x-1 transition-transform"></i>
+                    <i className="fa-solid fa-chevron-right text-amber-300 group-hover:translate-x-1 transition-transform"></i>
                   </button>
                 </div>
 

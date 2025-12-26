@@ -297,9 +297,9 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions, budgetAmount, onUpd
               <PieChart>
                 <Pie
                   data={categoryData}
-                  innerRadius={70}
-                  outerRadius={100}
-                  paddingAngle={5}
+                  innerRadius={60}
+                  outerRadius={85}
+                  paddingAngle={2}
                   dataKey="value"
                 >
                   {categoryData.map((entry, index) => (
@@ -307,7 +307,14 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions, budgetAmount, onUpd
                   ))}
                 </Pie>
                 <Tooltip content={<CustomTooltip />} wrapperStyle={{ zIndex: 1000 }} />
-                <Legend verticalAlign="bottom" height={36} />
+                <Legend
+                  verticalAlign="bottom"
+                  iconType="circle"
+                  wrapperStyle={{
+                    fontSize: '10px',
+                    paddingTop: '20px'
+                  }}
+                />
               </PieChart>
             </ResponsiveContainer>
           </div>
