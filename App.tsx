@@ -14,6 +14,8 @@ import Auth from './components/Auth';
 import MonthlySpreadsheet from './components/MonthlySpreadsheet';
 import LandingPage from './components/LandingPage';
 import { Session } from '@supabase/supabase-js';
+import { getAggregatedTransactions, getUniqueMonthsFromReports } from './utils/aggregationUtils';
+import PeriodDashboard from './components/PeriodDashboard';
 
 // New specialized components for UX 2.0
 const ProcessingBar: React.FC<{ progress: number }> = ({ progress }) => (
@@ -61,6 +63,10 @@ const App: React.FC = () => {
   const [tempReportName, setTempReportName] = useState("");
   const [showAuth, setShowAuth] = useState(false);
   const [currentBudget, setCurrentBudget] = useState<number>(0);
+  const [selectedPeriod, setSelectedPeriod] = useState<string>("");
+  const [selectedPeriodMode, setSelectedPeriodMode] = useState<'calendar' | 'mid-month'>('calendar');
+  const [aggregatedTransactions, setAggregatedTransactions] = useState<Transaction[]>([]);
+  const [showPeriodSelector, setShowPeriodSelector] = useState(false);
 
   // Auth listener
   useEffect(() => {
@@ -247,12 +253,30 @@ const App: React.FC = () => {
   };
 
   const handleUpdateBudget = async (amount: number) => {
-    if (!session || !currentReport) return;
+    if (!session) return;
+    const monthKey = status === AppState.PERIOD_DASHBOARD ? selectedPeriod : (currentReport?.name || "Global");
     try {
-      await storageService.saveBudget(session.user.id, currentReport.name, amount);
+      await storageService.saveBudget(session.user.id, monthKey, amount);
       setCurrentBudget(amount);
     } catch (err) {
       console.error('Failed to update budget:', err);
+    }
+  };
+
+  const handleViewPeriodDashboard = async (period: string, mode: 'calendar' | 'mid-month') => {
+    if (!session) return;
+    const agg = getAggregatedTransactions(savedReports, period, mode);
+    setAggregatedTransactions(agg);
+    setSelectedPeriod(period);
+    setSelectedPeriodMode(mode);
+    setShowPeriodSelector(false);
+    setStatus(AppState.PERIOD_DASHBOARD);
+
+    try {
+      const budget = await storageService.getBudget(session.user.id, period);
+      setCurrentBudget(budget);
+    } catch (err) {
+      console.error('Failed to fetch period budget:', err);
     }
   };
 
@@ -391,6 +415,55 @@ const App: React.FC = () => {
                 </div>
 
                 <div className="space-y-4">
+                  <button
+                    onClick={() => setShowPeriodSelector(!showPeriodSelector)}
+                    disabled={savedReports.length === 0}
+                    className="w-full group bg-blue-600 text-white p-6 rounded-2xl flex items-center justify-between hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 disabled:opacity-50"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i className="fa-solid fa-chart-line text-blue-200"></i>
+                      </div>
+                      <div className="text-left">
+                        <p className="font-bold">View Period Dashboard</p>
+                        <p className="text-xs text-blue-200">Aggregated cross-report summary</p>
+                      </div>
+                    </div>
+                    <i className={`fa-solid fa-chevron-${showPeriodSelector ? 'down' : 'right'} text-blue-400 transition-transform`}></i>
+                  </button>
+
+                  {showPeriodSelector && (
+                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 animate-in slide-in-from-top duration-300">
+                      <p className="text-[10px] text-slate-400 font-bold uppercase mb-3 text-center">Select Aggregation Period</p>
+                      <div className="max-h-48 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                        {getUniqueMonthsFromReports(savedReports).map(period => {
+                          const isMidMonth = period.endsWith(' (Mid-Month)');
+                          const mode = isMidMonth ? 'mid-month' : 'calendar';
+                          const label = period.replace(' (Mid-Month)', '');
+
+                          return (
+                            <button
+                              key={period}
+                              onClick={() => handleViewPeriodDashboard(label, mode)}
+                              className={`w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between group/period ${isMidMonth
+                                ? 'bg-indigo-50/50 border-indigo-100 hover:border-indigo-300 hover:bg-indigo-50'
+                                : 'bg-white border-slate-200 hover:border-blue-300 hover:bg-blue-50/30'
+                                }`}
+                            >
+                              <div>
+                                <p className="text-xs font-black text-slate-800 tracking-tight">{label}</p>
+                                <p className={`text-[9px] font-bold uppercase tracking-wider mt-0.5 ${isMidMonth ? 'text-indigo-400' : 'text-slate-400'}`}>
+                                  {isMidMonth ? 'Mid-Month Cycle' : 'Calendar Month'}
+                                </p>
+                              </div>
+                              <i className={`fa-solid fa-chevron-right text-[10px] opacity-0 group-hover/period:opacity-100 transition-all ${isMidMonth ? 'text-indigo-300' : 'text-blue-300'}`}></i>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   <button
                     onClick={() => setStatus(AppState.MONTHLY_VIEW)}
                     disabled={savedReports.length === 0}
@@ -610,6 +683,18 @@ const App: React.FC = () => {
               userId={session?.user?.id}
             />
           </div>
+        )}
+        {status === AppState.PERIOD_DASHBOARD && (
+          <PeriodDashboard
+            transactions={aggregatedTransactions}
+            periodName={selectedPeriod}
+            periodKey={selectedPeriod}
+            mode={selectedPeriodMode!}
+            onBack={() => setStatus(AppState.IDLE)}
+            budgetAmount={currentBudget}
+            onUpdateBudget={(amt) => handleUpdateBudget(amt)}
+            allReports={savedReports}
+          />
         )}
       </main>
 

@@ -6,6 +6,7 @@ import {
   ComposedChart, Line
 } from 'recharts';
 import { Transaction } from '../types';
+import { parseStructuredDate, toISODateKey } from '../utils/dateUtils';
 
 interface DashboardProps {
   transactions: Transaction[];
@@ -70,36 +71,45 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions, budgetAmount, onUpd
   React.useEffect(() => {
     setBudgetInput(budgetAmount.toString());
   }, [budgetAmount]);
-  // 0. Filter and split transactions
-  const { outflows, inflows } = useMemo(() => {
-    return transactions.reduce((acc, t) => {
-      if (t.amount < 0) {
-        acc.outflows.push({ ...t, amount: Math.abs(t.amount) });
-      } else {
-        acc.inflows.push(t);
-      }
-      return acc;
-    }, { outflows: [] as Transaction[], inflows: [] as Transaction[] });
-  }, [transactions]);
+  // 0. Calculate category totals to define Inflows vs Outflows
+  const { outflows, inflows, categoryData } = useMemo(() => {
+    const totals: Record<string, { amount: number; transactions: Transaction[] }> = {};
 
-  // 1. Category Data (using Outflows)
-  const categoryData = useMemo(() => {
-    const summary: Record<string, { value: number, count: number, transactions: Transaction[] }> = {};
-    outflows.forEach(t => {
+    transactions.forEach(t => {
       const cat = t.category || "Other";
-      if (!summary[cat]) summary[cat] = { value: 0, count: 0, transactions: [] };
-      summary[cat].value += t.amount;
-      summary[cat].count += 1;
-      summary[cat].transactions.push(t);
+      if (!totals[cat]) totals[cat] = { amount: 0, transactions: [] };
+      totals[cat].amount += t.amount;
+      totals[cat].transactions.push(t);
     });
 
-    return Object.entries(summary).map(([name, stats]) => ({
-      name,
-      value: Number(stats.value.toFixed(2)),
-      count: stats.count,
-      transactions: stats.transactions.sort((a, b) => b.amount - a.amount).slice(0, 5)
-    })).sort((a, b) => b.value - a.value);
-  }, [outflows]);
+    const outflowsArr: Transaction[] = [];
+    const inflowsArr: Transaction[] = [];
+    const categoryStats: any[] = [];
+
+    Object.entries(totals).forEach(([name, stats]) => {
+      // If the category is NET negative, it's an Outflow (Expense)
+      if (stats.amount < 0) {
+        const absAmount = Math.abs(stats.amount);
+        // Add all transactions to outflow pool, but keep signs relative
+        // We map to absolute for the charts that expect positive values for slices
+        outflowsArr.push(...stats.transactions);
+        categoryStats.push({
+          name,
+          value: Number(absAmount.toFixed(2)),
+          count: stats.transactions.length,
+          transactions: stats.transactions.sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)).slice(0, 5)
+        });
+      } else {
+        inflowsArr.push(...stats.transactions);
+      }
+    });
+
+    return {
+      outflows: outflowsArr,
+      inflows: inflowsArr,
+      categoryData: categoryStats.sort((a, b) => b.value - a.value)
+    };
+  }, [transactions]);
 
   // 2. Daily Trend Data (Bar Chart logic)
   const dailyTrendData = useMemo(() => {
@@ -110,20 +120,11 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions, budgetAmount, onUpd
 
     outflows.forEach(t => {
       // Precise parsing for DD/MM/YYYY or YYYY-MM-DD
-      let date: Date;
-      if (t.date.includes('/')) {
-        const parts = t.date.split('/');
-        const d = parseInt(parts[0]);
-        const m = parseInt(parts[1]) - 1;
-        const y = parts[2].length === 2 ? 2000 + parseInt(parts[2]) : parseInt(parts[2]);
-        date = new Date(y, m, d);
-      } else {
-        date = new Date(t.date);
-      }
+      const date = parseStructuredDate(t.date);
 
       if (isNaN(date.getTime())) return;
 
-      const key = date.toISOString().split('T')[0];
+      const key = toISODateKey(date);
       if (!daily[key]) {
         daily[key] = { amount: 0, transactions: [], dateObj: date };
         dates.push(date);
@@ -142,13 +143,13 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions, budgetAmount, onUpd
     let current = new Date(minDate);
 
     while (current <= maxDate) {
-      const key = current.toISOString().split('T')[0];
+      const key = toISODateKey(current);
       const stats = daily[key];
 
       filledData.push({
         day: current.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
-        amount: Number((stats?.amount || 0).toFixed(2)),
-        transactions: (stats?.transactions || []).sort((a, b) => b.amount - a.amount).slice(0, 5),
+        amount: Number(Math.abs(stats?.amount || 0).toFixed(2)),
+        transactions: (stats?.transactions || []).sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)).slice(0, 5),
         count: stats?.transactions.length || 0,
         fullDate: key
       });
@@ -167,14 +168,14 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions, budgetAmount, onUpd
       merchants[name] = (merchants[name] || 0) + t.amount;
     });
     return Object.entries(merchants)
-      .map(([name, value]) => ({ name, value: Number(value.toFixed(2)) }))
+      .map(([name, value]) => ({ name, value: Number(Math.abs(value).toFixed(2)) }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 8);
   }, [outflows]);
 
   const totalSpent = categoryData.reduce((acc, curr) => acc + curr.value, 0);
   const totalIncome = inflows.reduce((acc, curr) => acc + curr.amount, 0);
-  const maxExpense = outflows.length > 0 ? Math.max(...outflows.map(t => t.amount)) : 0;
+  const maxExpense = outflows.length > 0 ? Math.max(...outflows.map(t => Math.abs(t.amount))) : 0;
   const topCategoryPercent = totalSpent > 0 ? (categoryData[0]?.value / totalSpent) * 100 : 0;
 
   return (
@@ -263,7 +264,7 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions, budgetAmount, onUpd
                   <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                     <div
                       className={`h-full transition-all duration-500 ${(totalSpent / budgetAmount) > 1 ? 'bg-rose-500' :
-                          (totalSpent / budgetAmount) > 0.8 ? 'bg-amber-500' : 'bg-emerald-500'
+                        (totalSpent / budgetAmount) > 0.8 ? 'bg-amber-500' : 'bg-emerald-500'
                         }`}
                       style={{ width: `${Math.min(100, (totalSpent / budgetAmount) * 100)}%` }}
                     />

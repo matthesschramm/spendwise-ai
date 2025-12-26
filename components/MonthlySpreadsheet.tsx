@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { SavedReport, Transaction } from '../types';
 import { storageService } from '../services/storageService';
+import { parseStructuredDate, getTransactionPeriod } from '../utils/dateUtils';
 
 const SpreadsheetTooltip: React.FC<{
     title: string;
@@ -110,9 +111,6 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
     const tableData = useMemo(() => {
         const monthMap: Record<string, Record<string, { total: number; transactions: Transaction[] }>> = {};
         const monthSortMap: Record<string, number> = {};
-        // Deduplication set to handle transactions that might exist in multiple overlapping reports
-        const seenTransactions = new Set<string>();
-
         const categories = new Set<string>();
         const incomeCategories = new Set<string>();
         const expenseCategories = new Set<string>();
@@ -120,48 +118,22 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
 
         reports.forEach(report => {
             report.transactions.forEach(t => {
-                // Deduplicate by Date + Description + Amount
-                const dupKey = `${t.date}|${t.description}|${t.amount}`;
-                if (seenTransactions.has(dupKey)) return;
-                seenTransactions.add(dupKey);
-                // Robust date parsing: explicitly handle DD/MM/YYYY
-                let date: Date;
-                if (t.date.includes('/')) {
-                    const parts = t.date.split('/');
-                    if (parts.length === 3) {
-                        const d = parseInt(parts[0]);
-                        const m = parseInt(parts[1]) - 1; // 0-indexed
-                        const y = parts[2].length === 2 ? 2000 + parseInt(parts[2]) : parseInt(parts[2]);
-                        date = new Date(y, m, d);
-                    } else {
-                        date = new Date(t.date);
-                    }
-                } else {
-                    date = new Date(t.date);
-                }
-
+                const date = parseStructuredDate(t.date);
                 if (isNaN(date.getTime())) return;
 
-                let targetDate = new Date(date);
-                let monthKey: string;
-
-                if (mode === 'mid-month') {
-                    // Conventional Mid-Month: 15th of Month A to 14th of Month B is labeled "Month B"
-                    // e.g. 15 May to 14 June is "June"
-                    if (date.getDate() >= 15) {
-                        targetDate.setMonth(targetDate.getMonth() + 1);
-                    }
-                    monthKey = targetDate.toLocaleString('default', { month: 'long', year: 'numeric' }) + ' (Mid-Month)';
-                } else {
-                    monthKey = targetDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-                }
+                const monthKey = getTransactionPeriod(date, mode as 'calendar' | 'mid-month') + (mode === 'mid-month' ? ' (Mid-Month)' : '');
 
                 const cat = t.category || 'Other';
 
                 if (!monthMap[monthKey]) {
                     monthMap[monthKey] = {};
-                    // Use start of month for consistent sorting
-                    monthSortMap[monthKey] = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1).getTime();
+                    // Use a representative date for consistent sorting
+                    const representativeDate = new Date(date);
+                    if (mode === 'mid-month' && date.getDate() >= 15) {
+                        representativeDate.setDate(1);
+                        representativeDate.setMonth(representativeDate.getMonth() + 1);
+                    }
+                    monthSortMap[monthKey] = new Date(representativeDate.getFullYear(), representativeDate.getMonth(), 1).getTime();
                 }
 
                 if (!monthMap[monthKey][cat]) {
@@ -202,7 +174,7 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
             expenseCategories: Array.from(expenseCategories).sort(),
             data: monthMap
         };
-    }, [reports]);
+    }, [reports, mode, categoryBudgets]);
 
     if (reports.length === 0) {
         return (
