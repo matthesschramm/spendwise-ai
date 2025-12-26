@@ -26,7 +26,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
                     <div className="relative z-10 animate-in fade-in slide-in-from-left duration-700">
                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 mb-6 font-bold text-xs text-blue-600 uppercase tracking-widest">
                             <i className="fa-solid fa-sparkles"></i>
-                            Powered by Gemini 1.5 Pro
+                            Powered by Gemini 3 Flash
                         </div>
                         <h1 className="text-6xl lg:text-7xl font-extrabold text-slate-900 leading-[1.1] mb-8 tracking-tight">
                             Master your money with <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-emerald-500">financial AI.</span>
