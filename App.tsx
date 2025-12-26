@@ -354,7 +354,7 @@ const App: React.FC = () => {
       <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 h-20 flex items-center justify-between">
           <div className="flex items-center cursor-pointer h-full py-2" onClick={reset}>
-            <img src="/logo-new.jpg" alt="SpendWise Logo" className="h-20 w-auto object-contain rounded-xl shadow-sm border border-slate-50" />
+            <img src="/logo.jpg" alt="SpendWise Logo" className="h-20 w-auto object-contain rounded-xl shadow-sm border border-slate-50" />
           </div>
           <div className="flex items-center gap-4">
             {status !== AppState.IDLE && (
