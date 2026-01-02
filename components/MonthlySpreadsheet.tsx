@@ -90,6 +90,10 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
     const [categoryBudgets, setCategoryBudgets] = React.useState<Record<string, number>>({});
     const [editingCategory, setEditingCategory] = React.useState<string | null>(null);
     const [editValue, setEditValue] = React.useState("");
+    const [expenseOrder, setExpenseOrder] = React.useState<string[]>([]);
+    const [incomeOrder, setIncomeOrder] = React.useState<string[]>([]);
+    const [draggedCategory, setDraggedCategory] = React.useState<{ name: string; type: 'income' | 'expense' } | null>(null);
+    const [dragOverCategory, setDragOverCategory] = React.useState<string | null>(null);
     const closeTimeout = React.useRef<NodeJS.Timeout | null>(null);
 
     React.useEffect(() => {
@@ -115,6 +119,11 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
         if (userId) {
             storageService.getCategoryBudgets(userId, 'Global')
                 .then(setCategoryBudgets);
+
+            storageService.getCategoryOrder(userId, 'expense')
+                .then(setExpenseOrder);
+            storageService.getCategoryOrder(userId, 'income')
+                .then(setIncomeOrder);
         }
     }, [userId]);
 
@@ -125,6 +134,61 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
             setCategoryBudgets(prev => ({ ...prev, [category]: amount }));
         }
         setEditingCategory(null);
+    };
+
+    const handleDragStart = (e: React.DragEvent, name: string, type: 'income' | 'expense') => {
+        setDraggedCategory({ name, type });
+        e.dataTransfer.effectAllowed = 'move';
+        // Add a slight delay to ensure the drag image is created before we potentially change styles
+        setTimeout(() => {
+            (e.target as HTMLElement).classList.add('opacity-40');
+        }, 0);
+    };
+
+    const handleDragEnd = (e: React.DragEvent) => {
+        (e.target as HTMLElement).classList.remove('opacity-40');
+        setDraggedCategory(null);
+        setDragOverCategory(null);
+    };
+
+    const handleDragOver = (e: React.DragEvent, name: string) => {
+        e.preventDefault();
+        if (draggedCategory && draggedCategory.name !== name) {
+            setDragOverCategory(name);
+        }
+    };
+
+    const handleDrop = async (e: React.DragEvent, targetName: string, type: 'income' | 'expense') => {
+        e.preventDefault();
+        if (!draggedCategory || draggedCategory.type !== type || draggedCategory.name === targetName) return;
+
+        const currentOrder = type === 'income' ? incomeOrder : expenseOrder;
+        const setOrder = type === 'income' ? setIncomeOrder : setExpenseOrder;
+
+        // Get all categories of this type from the current reports
+        const categories = Array.from(type === 'income' ? tableData.incomeCategories : tableData.expenseCategories);
+
+        // Use either the saved order or the default sorted order
+        let fullOrder = currentOrder.length > 0 ? [...currentOrder] : [...categories];
+
+        // Ensure all current categories are in the order list
+        categories.forEach(cat => {
+            if (!fullOrder.includes(cat)) fullOrder.push(cat);
+        });
+
+        const oldIndex = fullOrder.indexOf(draggedCategory.name);
+        const newIndex = fullOrder.indexOf(targetName);
+
+        if (oldIndex !== -1 && newIndex !== -1) {
+            const newOrderList = [...fullOrder];
+            newOrderList.splice(oldIndex, 1);
+            newOrderList.splice(newIndex, 0, draggedCategory.name);
+
+            setOrder(newOrderList);
+            if (userId) {
+                await storageService.saveCategoryOrder(userId, type, newOrderList);
+            }
+        }
     };
 
     const tableData = useMemo(() => {
@@ -187,13 +251,28 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
             return monthSortMap[a] - monthSortMap[b];
         });
 
+        const sortCategories = (cats: Set<string>, order: string[]) => {
+            const catArray = Array.from(cats);
+            if (order.length === 0) return catArray.sort();
+
+            return catArray.sort((a, b) => {
+                const indexA = order.indexOf(a);
+                const indexB = order.indexOf(b);
+
+                if (indexA === -1 && indexB === -1) return a.localeCompare(b);
+                if (indexA === -1) return 1;
+                if (indexB === -1) return -1;
+                return indexA - indexB;
+            });
+        };
+
         return {
             months: sortedMonths,
-            incomeCategories: Array.from(incomeCategories).sort(),
-            expenseCategories: Array.from(expenseCategories).sort(),
+            incomeCategories: sortCategories(incomeCategories, incomeOrder),
+            expenseCategories: sortCategories(expenseCategories, expenseOrder),
             data: monthMap
         };
-    }, [reports, mode, categoryBudgets]);
+    }, [reports, mode, categoryBudgets, incomeOrder, expenseOrder]);
 
     const getVarianceStyle = (actual: number, budget: number, isIncome: boolean) => {
         if (!budget || budget === 0) return 'text-slate-900';
@@ -268,8 +347,21 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                                 </td>
                             </tr>
                             {tableData.incomeCategories.map(cat => (
-                                <tr key={cat} className="group hover:bg-slate-50 transition-colors">
-                                    <td className="p-4 text-sm font-bold text-slate-700 sticky left-0 bg-white group-hover:bg-slate-50 z-10 min-w-[256px] max-w-[256px] shadow-[1px_0_0_0_#f1f5f9] truncate">{cat}</td>
+                                <tr
+                                    key={cat}
+                                    draggable={true}
+                                    onDragStart={(e) => handleDragStart(e, cat, 'income')}
+                                    onDragEnd={handleDragEnd}
+                                    onDragOver={(e) => handleDragOver(e, cat)}
+                                    onDrop={(e) => handleDrop(e, cat, 'income')}
+                                    className={`group hover:bg-slate-50 transition-colors ${dragOverCategory === cat ? 'border-t-2 border-blue-500' : ''}`}
+                                >
+                                    <td className="p-4 text-sm font-bold text-slate-700 sticky left-0 bg-white group-hover:bg-slate-50 z-10 min-w-[256px] max-w-[256px] shadow-[1px_0_0_0_#f1f5f9] truncate">
+                                        <div className="flex items-center gap-2">
+                                            <i className="fa-solid fa-grip-vertical text-slate-300 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                                            {cat}
+                                        </div>
+                                    </td>
                                     <td className="p-4 text-sm font-black text-slate-900 sticky left-[256px] bg-emerald-50 z-10 border-r border-emerald-100 min-w-[128px] max-w-[128px] text-center shadow-[1px_0_0_0_#f1f5f9]">
                                         {editingCategory === cat ? (
                                             <input
@@ -341,8 +433,21 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                                 </td>
                             </tr>
                             {tableData.expenseCategories.map(cat => (
-                                <tr key={cat} className="group hover:bg-slate-50 transition-colors">
-                                    <td className="p-4 text-sm font-bold text-slate-700 sticky left-0 bg-white group-hover:bg-slate-50 z-10 min-w-[256px] max-w-[256px] shadow-[1px_0_0_0_#f1f5f9] truncate">{cat}</td>
+                                <tr
+                                    key={cat}
+                                    draggable={true}
+                                    onDragStart={(e) => handleDragStart(e, cat, 'expense')}
+                                    onDragEnd={handleDragEnd}
+                                    onDragOver={(e) => handleDragOver(e, cat)}
+                                    onDrop={(e) => handleDrop(e, cat, 'expense')}
+                                    className={`group hover:bg-slate-50 transition-colors ${dragOverCategory === cat ? 'border-t-2 border-blue-500' : ''}`}
+                                >
+                                    <td className="p-4 text-sm font-bold text-slate-700 sticky left-0 bg-white group-hover:bg-slate-50 z-10 min-w-[256px] max-w-[256px] shadow-[1px_0_0_0_#f1f5f9] truncate">
+                                        <div className="flex items-center gap-2">
+                                            <i className="fa-solid fa-grip-vertical text-slate-300 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                                            {cat}
+                                        </div>
+                                    </td>
                                     <td className="p-4 text-sm font-black text-slate-900 sticky left-[256px] bg-rose-50 z-10 border-r border-rose-100 min-w-[128px] max-w-[128px] text-center shadow-[1px_0_0_0_#f1f5f9]">
                                         {editingCategory === cat ? (
                                             <input

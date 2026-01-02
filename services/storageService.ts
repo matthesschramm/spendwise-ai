@@ -200,5 +200,41 @@ export const storageService = {
       acc[row.category_name] = row.is_discretionary;
       return acc;
     }, {});
+  },
+
+  saveCategoryOrder: async (userId: string, categoryType: 'income' | 'expense', order: string[]): Promise<void> => {
+    const { error } = await supabase
+      .from('category_order')
+      .upsert([
+        {
+          user_id: userId,
+          category_type: categoryType,
+          ordered_categories: order,
+          updated_at: new Date().toISOString()
+        }
+      ], { onConflict: 'user_id,category_type' });
+
+    if (error) {
+      console.error('Error saving category order:', error);
+      throw error;
+    }
+  },
+
+  getCategoryOrder: async (userId: string, categoryType: 'income' | 'expense'): Promise<string[]> => {
+    const { data, error } = await supabase
+      .from('category_order')
+      .select('ordered_categories')
+      .eq('user_id', userId)
+      .eq('category_type', categoryType)
+      .single();
+
+    if (error) {
+      if (error.code !== 'PGRST116') { // Not found is fine
+        console.error('Error fetching category order:', error);
+      }
+      return [];
+    }
+
+    return (data?.ordered_categories as string[]) || [];
   }
 };
