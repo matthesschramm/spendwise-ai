@@ -16,6 +16,7 @@ import LandingPage from './components/LandingPage';
 import { Session } from '@supabase/supabase-js';
 import { getAggregatedTransactions, getUniqueMonthsFromReports } from './utils/aggregationUtils';
 import PeriodDashboard from './components/PeriodDashboard';
+import TrendAnalysis from './components/TrendAnalysis';
 
 // New specialized components for UX 2.0
 const ProcessingBar: React.FC<{ progress: number }> = ({ progress }) => (
@@ -439,90 +440,96 @@ const App: React.FC = () => {
                   </p>
                 </div>
 
-                <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 mb-4">
                   <button
                     onClick={() => setShowPeriodSelector(!showPeriodSelector)}
                     disabled={savedReports.length === 0}
-                    className="w-full group bg-indigo-50 text-indigo-900 border border-indigo-100 p-6 rounded-2xl flex items-center justify-between hover:bg-indigo-100 transition-all shadow-sm disabled:opacity-50"
+                    className={`aspect-square group p-4 rounded-3xl border flex flex-col items-center justify-center text-center transition-all hover:scale-[1.02] shadow-sm disabled:opacity-50 ${showPeriodSelector ? 'bg-indigo-100 border-indigo-300 ring-2 ring-indigo-200' : 'bg-indigo-50 border-indigo-100'
+                      }`}
                   >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <i className="fa-solid fa-chart-line text-white"></i>
-                      </div>
-                      <div className="text-left">
-                        <p className="font-bold text-indigo-900">View Period Dashboard</p>
-                        <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Aggregated Analysis</p>
-                      </div>
+                    <div className="w-12 h-12 bg-indigo-500 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-sm">
+                      <i className="fa-solid fa-chart-line text-white text-xl"></i>
                     </div>
-                    <i className={`fa-solid fa-chevron-${showPeriodSelector ? 'down' : 'right'} text-indigo-300 transition-transform`}></i>
+                    <div className="space-y-1 text-center">
+                      <p className="font-bold text-indigo-900 text-sm leading-tight">Period Dashboard</p>
+                      <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest leading-none">Aggregated</p>
+                    </div>
                   </button>
-
-                  {showPeriodSelector && (
-                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 animate-in slide-in-from-top duration-300">
-                      <p className="text-[10px] text-slate-400 font-bold uppercase mb-3 text-center">Select Aggregation Period</p>
-                      <div className="max-h-48 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                        {getUniqueMonthsFromReports(savedReports).map(period => {
-                          const isMidMonth = period.endsWith(' (Mid-Month)');
-                          const mode = isMidMonth ? 'mid-month' : 'calendar';
-                          const label = period.replace(' (Mid-Month)', '');
-
-                          return (
-                            <button
-                              key={period}
-                              onClick={() => handleViewPeriodDashboard(label, mode)}
-                              className={`w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between group/period ${isMidMonth
-                                ? 'bg-indigo-50/50 border-indigo-100 hover:border-indigo-300 hover:bg-indigo-50'
-                                : 'bg-white border-slate-200 hover:border-blue-300 hover:bg-blue-50/30'
-                                }`}
-                            >
-                              <div>
-                                <p className="text-xs font-black text-slate-800 tracking-tight">{label}</p>
-                                <p className={`text-[9px] font-bold uppercase tracking-wider mt-0.5 ${isMidMonth ? 'text-indigo-400' : 'text-slate-400'}`}>
-                                  {isMidMonth ? 'Mid-Month Cycle' : 'Calendar Month'}
-                                </p>
-                              </div>
-                              <i className={`fa-solid fa-chevron-right text-[10px] opacity-0 group-hover/period:opacity-100 transition-all ${isMidMonth ? 'text-indigo-300' : 'text-blue-300'}`}></i>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
 
                   <button
                     onClick={() => setStatus(AppState.MONTHLY_VIEW)}
                     disabled={savedReports.length === 0}
-                    className="w-full group bg-emerald-50 text-emerald-900 border border-emerald-100 p-6 rounded-2xl flex items-center justify-between hover:bg-emerald-100 transition-all shadow-sm disabled:opacity-50 disabled:grayscale"
+                    className="aspect-square group p-4 rounded-3xl bg-emerald-50 border border-emerald-100 flex flex-col items-center justify-center text-center transition-all hover:scale-[1.02] shadow-sm disabled:opacity-50 disabled:grayscale"
                   >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <i className="fa-solid fa-table-list text-white"></i>
-                      </div>
-                      <div className="text-left">
-                        <p className="font-bold text-emerald-900">Calendar View</p>
-                        <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Monthly Comparison</p>
-                      </div>
+                    <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-sm">
+                      <i className="fa-solid fa-table-list text-white text-xl"></i>
                     </div>
-                    <i className="fa-solid fa-chevron-right text-emerald-300 group-hover:translate-x-1 transition-transform"></i>
+                    <div className="space-y-1 text-center">
+                      <p className="font-bold text-emerald-900 text-sm leading-tight">Calendar View</p>
+                      <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest leading-none">Monthly</p>
+                    </div>
                   </button>
 
                   <button
                     onClick={() => setStatus(AppState.MID_MONTH_VIEW)}
                     disabled={savedReports.length === 0}
-                    className="w-full group bg-amber-50 text-amber-900 border border-amber-100 p-6 rounded-2xl flex items-center justify-between hover:bg-amber-100 transition-all shadow-sm disabled:opacity-50 disabled:grayscale"
+                    className="aspect-square group p-4 rounded-3xl bg-amber-50 border border-amber-100 flex flex-col items-center justify-center text-center transition-all hover:scale-[1.02] shadow-sm disabled:opacity-50 disabled:grayscale"
                   >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-amber-400 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <i className="fa-solid fa-calendar-day text-white"></i>
-                      </div>
-                      <div className="text-left">
-                        <p className="font-bold text-amber-900">Mid-Month View</p>
-                        <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">15th to 14th Cycle</p>
-                      </div>
+                    <div className="w-12 h-12 bg-amber-400 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-sm">
+                      <i className="fa-solid fa-calendar-day text-white text-xl"></i>
                     </div>
-                    <i className="fa-solid fa-chevron-right text-amber-300 group-hover:translate-x-1 transition-transform"></i>
+                    <div className="space-y-1 text-center">
+                      <p className="font-bold text-amber-900 text-sm leading-tight">Mid-Month View</p>
+                      <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest leading-none">15th Cycle</p>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => setStatus(AppState.TREND_ANALYSIS)}
+                    disabled={savedReports.length === 0}
+                    className="aspect-square group p-4 rounded-3xl bg-rose-50 border border-rose-100 flex flex-col items-center justify-center text-center transition-all hover:scale-[1.02] shadow-sm disabled:opacity-50 disabled:grayscale"
+                  >
+                    <div className="w-12 h-12 bg-rose-500 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-sm">
+                      <i className="fa-solid fa-arrow-trend-up text-white text-xl"></i>
+                    </div>
+                    <div className="space-y-1 text-center">
+                      <p className="font-bold text-rose-900 text-sm leading-tight">Trend Analysis</p>
+                      <p className="text-[10px] font-bold text-rose-400 uppercase tracking-widest leading-none">View Trends</p>
+                    </div>
                   </button>
                 </div>
+
+                {showPeriodSelector && (
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 animate-in slide-in-from-top duration-300 mb-4">
+                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-3 text-center">Select Aggregation Period</p>
+                    <div className="max-h-48 overflow-y-auto space-y-2 pr-2 custom-scrollbar focus:outline-none">
+                      {getUniqueMonthsFromReports(savedReports).map(period => {
+                        const isMidMonth = period.endsWith(' (Mid-Month)');
+                        const mode = isMidMonth ? 'mid-month' : 'calendar';
+                        const label = period.replace(' (Mid-Month)', '');
+
+                        return (
+                          <button
+                            key={period}
+                            onClick={() => handleViewPeriodDashboard(label, mode)}
+                            className={`w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between group/period ${isMidMonth
+                              ? 'bg-indigo-50/50 border-indigo-100 hover:border-indigo-300 hover:bg-indigo-50'
+                              : 'bg-white border-slate-200 hover:border-blue-300 hover:bg-blue-50/30'
+                              }`}
+                          >
+                            <div>
+                              <p className="text-xs font-black text-slate-800 tracking-tight">{label}</p>
+                              <p className={`text-[9px] font-bold uppercase tracking-wider mt-0.5 ${isMidMonth ? 'text-indigo-400' : 'text-slate-400'}`}>
+                                {isMidMonth ? 'Mid-Month Cycle' : 'Calendar Month'}
+                              </p>
+                            </div>
+                            <i className={`fa-solid fa-chevron-right text-[10px] opacity-0 group-hover/period:opacity-100 transition-all ${isMidMonth ? 'text-indigo-300' : 'text-blue-300'}`}></i>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {savedReports.length === 0 && (
                   <p className="text-center text-[10px] text-slate-400 font-bold mt-4 uppercase tracking-widest">
@@ -721,6 +728,14 @@ const App: React.FC = () => {
             onUpdateBudget={(amt) => handleUpdateBudget(amt)}
             allReports={savedReports}
           />
+        )}
+        {status === AppState.TREND_ANALYSIS && (
+          <div className="animate-in fade-in slide-in-from-bottom duration-500">
+            <TrendAnalysis
+              reports={savedReports}
+              onBack={() => setStatus(AppState.IDLE)}
+            />
+          </div>
         )}
       </main>
 

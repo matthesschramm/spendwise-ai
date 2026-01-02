@@ -45,3 +45,51 @@ export const getUniqueMonthsFromReports = (reports: SavedReport[]): string[] => 
         return getPeriodSortValue(b) - getPeriodSortValue(a); // Newest first
     });
 };
+
+export interface TrendDataPoint {
+    month: string;
+    discretionary: number;
+    nonDiscretionary: number;
+    categories: Record<string, number>; // Breakdown by category
+}
+
+/**
+ * Aggregates expense data across all reports, grouped by month and discretionary status.
+ */
+export const aggregateTrendData = (reports: SavedReport[]): TrendDataPoint[] => {
+    const monthMap: Record<string, { discretionary: number; nonDiscretionary: number; categories: Record<string, number> }> = {};
+
+    reports.forEach(report => {
+        report.transactions.forEach(t => {
+            if (t.amount >= 0) return; // Only expenses
+
+            const d = parseStructuredDate(t.date);
+            if (isNaN(d.getTime())) return;
+
+            const month = getTransactionPeriod(d, 'calendar');
+            if (!monthMap[month]) {
+                monthMap[month] = { discretionary: 0, nonDiscretionary: 0, categories: {} };
+            }
+
+            const absAmount = Math.abs(t.amount);
+            const cat = t.category || 'Other';
+
+            // Track total by discretionary status
+            if (t.discretionary === false) {
+                monthMap[month].nonDiscretionary += absAmount;
+            } else {
+                monthMap[month].discretionary += absAmount;
+            }
+
+            // Track category-specific total
+            monthMap[month].categories[cat] = (monthMap[month].categories[cat] || 0) + absAmount;
+        });
+    });
+
+    return Object.entries(monthMap)
+        .map(([month, data]) => ({
+            month,
+            ...data
+        }))
+        .sort((a, b) => getPeriodSortValue(a.month) - getPeriodSortValue(b.month));
+};
