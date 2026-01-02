@@ -165,5 +165,40 @@ export const storageService = {
     }
 
     return data || [];
+  },
+
+  saveCategorySetting: async (userId: string, category: string, isDiscretionary: boolean): Promise<void> => {
+    const { error } = await supabase
+      .from('category_settings')
+      .upsert([
+        {
+          user_id: userId,
+          category_name: category,
+          is_discretionary: isDiscretionary,
+          updated_at: new Date().toISOString()
+        }
+      ], { onConflict: 'user_id,category_name' });
+
+    if (error) {
+      console.error('Error saving category setting:', error);
+      throw error;
+    }
+  },
+
+  getCategorySettings: async (userId: string): Promise<Record<string, boolean>> => {
+    const { data, error } = await supabase
+      .from('category_settings')
+      .select('category_name, is_discretionary')
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('Error fetching category settings:', error);
+      return {};
+    }
+
+    return (data || []).reduce((acc: Record<string, boolean>, row: any) => {
+      acc[row.category_name] = row.is_discretionary;
+      return acc;
+    }, {});
   }
 };

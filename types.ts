@@ -5,6 +5,7 @@ export interface Transaction {
   description: string;
   amount: number;
   category?: string;
+  discretionary?: boolean;
   confidence?: number;
   groundingSources?: GroundingSource[];
 }

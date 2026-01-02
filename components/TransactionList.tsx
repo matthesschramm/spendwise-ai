@@ -4,9 +4,11 @@ import { Transaction } from '../types';
 interface TransactionListProps {
   transactions: Transaction[];
   onEditCategory?: (id: string, newCategory: string) => void;
+  onEditDiscretionary?: (id: string, isDiscretionary: boolean) => void;
 }
 
 const COMMON_CATEGORIES = [
+  // ... (rest of the file)
   "Food - Supermarkets",
   "Food - Dining",
   "Shopping",
@@ -22,7 +24,7 @@ const COMMON_CATEGORIES = [
   "Other"
 ];
 
-const TransactionList: React.FC<TransactionListProps> = ({ transactions, onEditCategory }) => {
+const TransactionList: React.FC<TransactionListProps> = ({ transactions, onEditCategory, onEditDiscretionary }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
 
@@ -62,6 +64,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onEditC
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Date</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Description</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Category</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Type</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Amount</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">AI Insight</th>
             </tr>
@@ -102,6 +105,19 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onEditC
                       </select>
                     )}
                   </div>
+                </td>
+                <td className="px-6 py-4">
+                  <select
+                    value={t.discretionary === false ? "non-discretionary" : "discretionary"}
+                    onChange={(e) => onEditDiscretionary && onEditDiscretionary(t.id, e.target.value === "discretionary")}
+                    className={`text-[10px] uppercase tracking-wider font-black border border-transparent rounded px-2 py-1 outline-none cursor-pointer transition-all ${t.discretionary === false
+                        ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                      } ${!onEditDiscretionary ? 'pointer-events-none' : ''}`}
+                  >
+                    <option value="discretionary">Discretionary</option>
+                    <option value="non-discretionary">Non-Discretionary</option>
+                  </select>
                 </td>
                 <td className="px-6 py-4 text-sm font-bold text-slate-800 text-right">
                   ${t.amount.toFixed(2)}

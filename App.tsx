@@ -236,6 +236,31 @@ const App: React.FC = () => {
     }
   };
 
+  const handleEditDiscretionary = (txId: string, isDiscretionary: boolean) => {
+    const transaction = transactions.find(t => t.id === txId);
+    if (!transaction || !transaction.category) return;
+
+    // Update all transactions in this category for consistency
+    const updatedTransactions = transactions.map(t =>
+      t.category === transaction.category ? { ...t, discretionary: isDiscretionary } : t
+    );
+
+    setTransactions(updatedTransactions);
+
+    if (currentReport) {
+      setCurrentReport({
+        ...currentReport,
+        transactions: updatedTransactions
+      });
+    }
+
+    // SpendWise Learning Loop: Persist category setting to Supabase
+    if (session) {
+      storageService.saveCategorySetting(session.user.id, transaction.category, isDiscretionary)
+        .catch(err => console.error('Failed to save category setting:', err));
+    }
+  };
+
   const handleSelectReport = async (report: SavedReport) => {
     console.log(`Selecting report: ${report.name}`, report);
     if (!report.transactions || report.transactions.length === 0) {
@@ -637,6 +662,7 @@ const App: React.FC = () => {
             <TransactionList
               transactions={transactions}
               onEditCategory={handleEditTransactionCategory}
+              onEditDiscretionary={handleEditDiscretionary}
             />
 
             {savedReports.length > 1 && (
