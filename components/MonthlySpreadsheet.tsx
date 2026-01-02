@@ -8,7 +8,9 @@ const SpreadsheetTooltip: React.FC<{
     total: number;
     transactions: Transaction[];
     position: { x: number; y: number };
-}> = ({ title, total, transactions, position }) => {
+    onMouseEnter: () => void;
+    onMouseLeave: () => void;
+}> = ({ title, total, transactions, position, onMouseEnter, onMouseLeave }) => {
     // Breakdown totals
     const { outflows, inflows } = transactions.reduce((acc, t) => {
         if (t.amount < 0) acc.outflows += t.amount;
@@ -16,16 +18,18 @@ const SpreadsheetTooltip: React.FC<{
         return acc;
     }, { outflows: 0, inflows: 0 });
 
-    // Show top transactions by magnitude
-    const sorted = [...transactions].sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)).slice(0, 10);
+    // Show all transactions sorted by magnitude
+    const sorted = [...transactions].sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
 
     return (
         <div
-            className="fixed z-[9999] bg-white p-5 rounded-2xl shadow-2xl border border-slate-200 min-w-[320px] animate-in fade-in zoom-in duration-150 pointer-events-none"
+            className="fixed z-[9999] bg-white p-5 rounded-2xl shadow-2xl border border-slate-200 min-w-[320px] animate-in fade-in zoom-in duration-150 pointer-events-auto"
             style={{
                 left: Math.min(position.x + 20, window.innerWidth - 340),
                 top: Math.min(position.y + 20, window.innerHeight - 400)
             }}
+            onMouseEnter={onMouseEnter}
+            onMouseLeave={onMouseLeave}
         >
             <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
                 <span className="text-sm font-black text-slate-900">{title}</span>
@@ -48,7 +52,7 @@ const SpreadsheetTooltip: React.FC<{
 
             <div className="space-y-2">
                 <p className="text-[10px] uppercase font-black text-slate-400 tracking-widest mb-1">Detailed Breakdown</p>
-                <div className="max-h-[220px] overflow-y-auto pr-2 custom-scrollbar focus:outline-none">
+                <div className="max-h-[200px] overflow-y-auto pr-2 custom-scrollbar focus:outline-none pointer-events-auto">
                     {sorted.map((t, idx) => {
                         const isOutflow = t.amount < 0;
                         return (
@@ -63,11 +67,6 @@ const SpreadsheetTooltip: React.FC<{
                             </div>
                         );
                     })}
-                    {transactions.length > 10 && (
-                        <p className="text-[10px] text-blue-600 font-black mt-3 text-center bg-blue-50 py-1.5 rounded-lg border border-blue-100">
-                            + {transactions.length - 10} additional items
-                        </p>
-                    )}
                 </div>
             </div>
         </div>
@@ -91,7 +90,27 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
     const [categoryBudgets, setCategoryBudgets] = React.useState<Record<string, number>>({});
     const [editingCategory, setEditingCategory] = React.useState<string | null>(null);
     const [editValue, setEditValue] = React.useState("");
+    const closeTimeout = React.useRef<NodeJS.Timeout | null>(null);
 
+    React.useEffect(() => {
+        return () => {
+            if (closeTimeout.current) clearTimeout(closeTimeout.current);
+        };
+    }, []);
+
+    const clearTooltipTimer = () => {
+        if (closeTimeout.current) {
+            clearTimeout(closeTimeout.current);
+            closeTimeout.current = null;
+        }
+    };
+
+    const startTooltipTimer = () => {
+        clearTooltipTimer();
+        closeTimeout.current = setTimeout(() => {
+            setActiveTooltip(null);
+        }, 150);
+    };
     React.useEffect(() => {
         if (userId) {
             storageService.getCategoryBudgets(userId, 'Global')
@@ -281,13 +300,18 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                                             <td
                                                 key={month}
                                                 className={`p-4 text-sm font-black text-right transition-colors ${val > 0 ? varianceStyle : 'text-slate-300'} hover:bg-emerald-100/50 cursor-help relative`}
-                                                onMouseEnter={(e) => val > 0 && setActiveTooltip({
-                                                    title: `${cat} - ${month}`,
-                                                    total: val,
-                                                    transactions: cell.transactions,
-                                                    position: { x: e.clientX, y: e.clientY }
-                                                })}
-                                                onMouseLeave={() => setActiveTooltip(null)}
+                                                onMouseEnter={(e) => {
+                                                    if (val > 0) {
+                                                        clearTooltipTimer();
+                                                        setActiveTooltip({
+                                                            title: `${cat} - ${month}`,
+                                                            total: val,
+                                                            transactions: cell.transactions,
+                                                            position: { x: e.clientX, y: e.clientY }
+                                                        });
+                                                    }
+                                                }}
+                                                onMouseLeave={startTooltipTimer}
                                             >
                                                 {val !== 0 ? `$${val.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '-'}
                                             </td>
@@ -350,13 +374,18 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                                             <td
                                                 key={month}
                                                 className={`p-4 text-sm font-black text-right transition-colors ${val < 0 ? varianceStyle : 'text-slate-300'} hover:bg-red-100/50 cursor-help relative`}
-                                                onMouseEnter={(e) => val < 0 && setActiveTooltip({
-                                                    title: `${cat} - ${month}`,
-                                                    total: val,
-                                                    transactions: cell.transactions,
-                                                    position: { x: e.clientX, y: e.clientY }
-                                                })}
-                                                onMouseLeave={() => setActiveTooltip(null)}
+                                                onMouseEnter={(e) => {
+                                                    if (val < 0) {
+                                                        clearTooltipTimer();
+                                                        setActiveTooltip({
+                                                            title: `${cat} - ${month}`,
+                                                            total: val,
+                                                            transactions: cell.transactions,
+                                                            position: { x: e.clientX, y: e.clientY }
+                                                        });
+                                                    }
+                                                }}
+                                                onMouseLeave={startTooltipTimer}
                                             >
                                                 {val !== 0 ? `$${absVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '-'}
                                             </td>
@@ -415,7 +444,13 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                 </div>
             </div>
 
-            {activeTooltip && <SpreadsheetTooltip {...activeTooltip} />}
+            {activeTooltip && (
+                <SpreadsheetTooltip
+                    {...activeTooltip}
+                    onMouseEnter={clearTooltipTimer}
+                    onMouseLeave={startTooltipTimer}
+                />
+            )}
         </div>
     );
 };
