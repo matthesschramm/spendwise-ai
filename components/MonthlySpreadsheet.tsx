@@ -177,7 +177,7 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
     }, [reports, mode, categoryBudgets]);
 
     const getVarianceStyle = (actual: number, budget: number, isIncome: boolean) => {
-        if (!budget || budget === 0) return '';
+        if (!budget || budget === 0) return 'text-slate-900';
 
         const absActual = Math.abs(actual);
         const variance = isIncome ? (actual - budget) : (budget - absActual);
@@ -251,7 +251,7 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                             {tableData.incomeCategories.map(cat => (
                                 <tr key={cat} className="group hover:bg-slate-50 transition-colors">
                                     <td className="p-4 text-sm font-bold text-slate-700 sticky left-0 bg-white group-hover:bg-slate-50 z-10 min-w-[256px] max-w-[256px] shadow-[1px_0_0_0_#f1f5f9] truncate">{cat}</td>
-                                    <td className="p-4 text-sm font-black text-emerald-600 sticky left-[256px] bg-emerald-50 z-10 border-r border-emerald-100 min-w-[128px] max-w-[128px] text-center shadow-[1px_0_0_0_#f1f5f9]">
+                                    <td className="p-4 text-sm font-black text-slate-900 sticky left-[256px] bg-emerald-50 z-10 border-r border-emerald-100 min-w-[128px] max-w-[128px] text-center shadow-[1px_0_0_0_#f1f5f9]">
                                         {editingCategory === cat ? (
                                             <input
                                                 autoFocus
@@ -280,7 +280,7 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                                         return (
                                             <td
                                                 key={month}
-                                                className={`p-4 text-sm font-black text-right transition-colors ${val > 0 ? (varianceStyle || 'text-emerald-600 bg-emerald-50/20') : 'text-slate-300'} hover:bg-emerald-100/50 cursor-help relative`}
+                                                className={`p-4 text-sm font-black text-right transition-colors ${val > 0 ? varianceStyle : 'text-slate-300'} hover:bg-emerald-100/50 cursor-help relative`}
                                                 onMouseEnter={(e) => val > 0 && setActiveTooltip({
                                                     title: `${cat} - ${month}`,
                                                     total: val,
@@ -319,7 +319,7 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                             {tableData.expenseCategories.map(cat => (
                                 <tr key={cat} className="group hover:bg-slate-50 transition-colors">
                                     <td className="p-4 text-sm font-bold text-slate-700 sticky left-0 bg-white group-hover:bg-slate-50 z-10 min-w-[256px] max-w-[256px] shadow-[1px_0_0_0_#f1f5f9] truncate">{cat}</td>
-                                    <td className="p-4 text-sm font-black text-rose-600 sticky left-[256px] bg-rose-50 z-10 border-r border-rose-100 min-w-[128px] max-w-[128px] text-center shadow-[1px_0_0_0_#f1f5f9]">
+                                    <td className="p-4 text-sm font-black text-slate-900 sticky left-[256px] bg-rose-50 z-10 border-r border-rose-100 min-w-[128px] max-w-[128px] text-center shadow-[1px_0_0_0_#f1f5f9]">
                                         {editingCategory === cat ? (
                                             <input
                                                 autoFocus
@@ -349,7 +349,7 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                                         return (
                                             <td
                                                 key={month}
-                                                className={`p-4 text-sm font-black text-right transition-colors ${val < 0 ? (varianceStyle || 'text-red-500 bg-red-50/20') : 'text-slate-300'} hover:bg-red-100/50 cursor-help relative`}
+                                                className={`p-4 text-sm font-black text-right transition-colors ${val < 0 ? varianceStyle : 'text-slate-300'} hover:bg-red-100/50 cursor-help relative`}
                                                 onMouseEnter={(e) => val < 0 && setActiveTooltip({
                                                     title: `${cat} - ${month}`,
                                                     total: val,
