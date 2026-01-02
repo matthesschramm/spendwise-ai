@@ -176,6 +176,24 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
         };
     }, [reports, mode, categoryBudgets]);
 
+    const getVarianceStyle = (actual: number, budget: number, isIncome: boolean) => {
+        if (!budget || budget === 0) return '';
+
+        const absActual = Math.abs(actual);
+        const variance = isIncome ? (actual - budget) : (budget - absActual);
+
+        if (variance > 0) {
+            return 'text-emerald-600';
+        } else {
+            const isSignificant = Math.abs(variance) > (0.1 * budget);
+            if (isSignificant) {
+                return 'bg-rose-100 text-rose-900';
+            } else {
+                return 'text-rose-600';
+            }
+        }
+    };
+
     if (reports.length === 0) {
         return (
             <div className="bg-white p-12 rounded-3xl border border-slate-100 shadow-sm text-center">
@@ -256,10 +274,13 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                                     {tableData.months.map(month => {
                                         const cell = tableData.data[month][cat];
                                         const val = cell?.total || 0;
+                                        const budget = categoryBudgets[cat] || 0;
+                                        const varianceStyle = getVarianceStyle(val, budget, true);
+
                                         return (
                                             <td
                                                 key={month}
-                                                className={`p-4 text-sm font-black text-right transition-colors ${val > 0 ? 'text-emerald-600 bg-emerald-50/20 hover:bg-emerald-100/50' : 'text-slate-300'} cursor-help relative`}
+                                                className={`p-4 text-sm font-black text-right transition-colors ${val > 0 ? (varianceStyle || 'text-emerald-600 bg-emerald-50/20') : 'text-slate-300'} hover:bg-emerald-100/50 cursor-help relative`}
                                                 onMouseEnter={(e) => val > 0 && setActiveTooltip({
                                                     title: `${cat} - ${month}`,
                                                     total: val,
@@ -323,12 +344,12 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                                         const val = cell?.total || 0;
                                         const absVal = Math.abs(val);
                                         const budget = categoryBudgets[cat] || 0;
-                                        const isOver = budget > 0 && absVal > budget;
+                                        const varianceStyle = getVarianceStyle(val, budget, false);
 
                                         return (
                                             <td
                                                 key={month}
-                                                className={`p-4 text-sm font-black text-right transition-colors ${val < 0 ? 'text-red-500 bg-red-50/20 hover:bg-red-100/50' : 'text-slate-300'} cursor-help relative`}
+                                                className={`p-4 text-sm font-black text-right transition-colors ${val < 0 ? (varianceStyle || 'text-red-500 bg-red-50/20') : 'text-slate-300'} hover:bg-red-100/50 cursor-help relative`}
                                                 onMouseEnter={(e) => val < 0 && setActiveTooltip({
                                                     title: `${cat} - ${month}`,
                                                     total: val,
@@ -337,10 +358,7 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                                                 })}
                                                 onMouseLeave={() => setActiveTooltip(null)}
                                             >
-                                                <div className="flex items-center justify-end gap-1.5">
-                                                    {isOver && <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />}
-                                                    {val !== 0 ? `$${absVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '-'}
-                                                </div>
+                                                {val !== 0 ? `$${absVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '-'}
                                             </td>
                                         );
                                     })}
