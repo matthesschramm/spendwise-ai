@@ -39,7 +39,8 @@ const getCategoryColor = (cat: string, index: number) => {
 };
 
 const TrendAnalysis: React.FC<TrendAnalysisProps> = ({ reports, onBack }) => {
-    const trendData = useMemo(() => aggregateTrendData(reports), [reports]);
+    const [viewMode, setViewMode] = useState<'calendar' | 'mid-month'>('calendar');
+    const trendData = useMemo(() => aggregateTrendData(reports, viewMode), [reports, viewMode]);
     const [hiddenCategories, setHiddenCategories] = useState<Set<string>>(new Set());
 
     const categoriesByGroup = useMemo(() => {
@@ -96,8 +97,8 @@ const TrendAnalysis: React.FC<TrendAnalysisProps> = ({ reports, onBack }) => {
                         key={cat}
                         onClick={() => toggleCategory(cat)}
                         className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border flex items-center gap-1.5 ${isHidden
-                                ? 'bg-slate-50 border-slate-200 text-slate-400 grayscale line-through'
-                                : 'bg-white border-slate-100 text-slate-600 shadow-sm hover:border-slate-300'
+                            ? 'bg-slate-50 border-slate-200 text-slate-400 grayscale line-through'
+                            : 'bg-white border-slate-100 text-slate-600 shadow-sm hover:border-slate-300'
                             }`}
                     >
                         <span className="w-2 h-2 rounded-full" style={{ backgroundColor: isHidden ? '#cbd5e1' : color }}></span>
@@ -110,18 +111,44 @@ const TrendAnalysis: React.FC<TrendAnalysisProps> = ({ reports, onBack }) => {
 
     return (
         <div className="space-y-8 max-w-6xl mx-auto pb-12">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                 <div>
                     <h2 className="text-3xl font-black text-slate-900 tracking-tight">Spending Breakdown</h2>
                     <p className="text-slate-500 font-medium mt-1">Detailed month-on-month category analysis.</p>
                 </div>
-                <button
-                    onClick={onBack}
-                    className="text-sm font-bold text-slate-500 hover:text-slate-800 flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-slate-100 transition-all border border-transparent hover:border-slate-100"
-                >
-                    <i className="fa-solid fa-arrow-left"></i>
-                    Back to Hub
-                </button>
+
+                <div className="flex flex-wrap items-center gap-4">
+                    <div className="bg-slate-100 p-1 rounded-2xl flex items-center shadow-inner">
+                        <button
+                            onClick={() => setViewMode('calendar')}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${viewMode === 'calendar'
+                                    ? 'bg-white text-slate-900 shadow-sm'
+                                    : 'text-slate-500 hover:text-slate-700'
+                                }`}
+                        >
+                            <i className="fa-solid fa-calendar-days mr-2"></i>
+                            Calendar
+                        </button>
+                        <button
+                            onClick={() => setViewMode('mid-month')}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${viewMode === 'mid-month'
+                                    ? 'bg-white text-slate-900 shadow-sm'
+                                    : 'text-slate-500 hover:text-slate-700'
+                                }`}
+                        >
+                            <i className="fa-solid fa-arrows-left-right mr-2"></i>
+                            Mid-Month
+                        </button>
+                    </div>
+
+                    <button
+                        onClick={onBack}
+                        className="text-sm font-bold text-slate-500 hover:text-slate-800 flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-slate-100 transition-all border border-transparent hover:border-slate-100"
+                    >
+                        <i className="fa-solid fa-arrow-left"></i>
+                        Back to Hub
+                    </button>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 gap-12">

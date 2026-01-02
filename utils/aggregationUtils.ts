@@ -56,7 +56,7 @@ export interface TrendDataPoint {
 /**
  * Aggregates expense data across all reports, grouped by month and discretionary status.
  */
-export const aggregateTrendData = (reports: SavedReport[]): TrendDataPoint[] => {
+export const aggregateTrendData = (reports: SavedReport[], mode: 'calendar' | 'mid-month'): TrendDataPoint[] => {
     const monthMap: Record<string, { discretionary: number; nonDiscretionary: number; categories: Record<string, number> }> = {};
 
     reports.forEach(report => {
@@ -66,7 +66,7 @@ export const aggregateTrendData = (reports: SavedReport[]): TrendDataPoint[] => 
             const d = parseStructuredDate(t.date);
             if (isNaN(d.getTime())) return;
 
-            const month = getTransactionPeriod(d, 'calendar');
+            const month = getTransactionPeriod(d, mode);
             if (!monthMap[month]) {
                 monthMap[month] = { discretionary: 0, nonDiscretionary: 0, categories: {} };
             }
