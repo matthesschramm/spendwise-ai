@@ -1,14 +1,7 @@
 import React, { useState } from 'react';
 import { Transaction } from '../types';
 
-interface TransactionListProps {
-  transactions: Transaction[];
-  onEditCategory?: (id: string, newCategory: string) => void;
-  onEditDiscretionary?: (id: string, isDiscretionary: boolean) => void;
-}
-
-const COMMON_CATEGORIES = [
-  // ... (rest of the file)
+export const COMMON_CATEGORIES = [
   "Food - Supermarkets",
   "Food - Dining",
   "Shopping",
@@ -24,7 +17,19 @@ const COMMON_CATEGORIES = [
   "Other"
 ];
 
-const TransactionList: React.FC<TransactionListProps> = ({ transactions, onEditCategory, onEditDiscretionary }) => {
+interface TransactionListProps {
+  transactions: Transaction[];
+  onEditCategory?: (id: string, newCategory: string) => void;
+  onEditDiscretionary?: (id: string, isDiscretionary: boolean) => void;
+  availableCategories?: string[];
+}
+
+const TransactionList: React.FC<TransactionListProps> = ({
+  transactions,
+  onEditCategory,
+  onEditDiscretionary,
+  availableCategories = COMMON_CATEGORIES
+}) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
 
@@ -96,12 +101,9 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onEditC
                         className={`text-xs border border-transparent hover:border-slate-200 rounded px-1 py-0.5 outline-none cursor-pointer transition-colors font-medium ${onEditCategory ? 'text-blue-700 hover:bg-slate-100' : 'text-slate-600 pointer-events-none'
                           }`}
                       >
-                        {COMMON_CATEGORIES.map(cat => (
+                        {availableCategories.map(cat => (
                           <option key={cat} value={cat}>{cat}</option>
                         ))}
-                        {!COMMON_CATEGORIES.includes(t.category || "") && t.category && (
-                          <option value={t.category}>{t.category}</option>
-                        )}
                       </select>
                     )}
                   </div>
@@ -111,8 +113,8 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onEditC
                     value={t.discretionary === false ? "non-discretionary" : "discretionary"}
                     onChange={(e) => onEditDiscretionary && onEditDiscretionary(t.id, e.target.value === "discretionary")}
                     className={`text-[10px] uppercase tracking-wider font-black border border-transparent rounded px-2 py-1 outline-none cursor-pointer transition-all ${t.discretionary === false
-                        ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                        : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                      ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
                       } ${!onEditDiscretionary ? 'pointer-events-none' : ''}`}
                   >
                     <option value="discretionary">Discretionary</option>

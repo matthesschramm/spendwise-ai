@@ -1,9 +1,9 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { Transaction, AppState, SavedReport } from './types';
 import FileUpload from './components/FileUpload';
 import Dashboard from './components/Dashboard';
-import TransactionList from './components/TransactionList';
+import TransactionList, { COMMON_CATEGORIES } from './components/TransactionList';
 import ReportHistory from './components/ReportHistory';
 import ComparisonView from './components/ComparisonView';
 import { parseCSV } from './utils/csvParser';
@@ -52,6 +52,21 @@ const App: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
+
+  const allCategories = useMemo(() => {
+    const cats = new Set<string>(COMMON_CATEGORIES);
+    // Add categories from saved reports
+    savedReports.forEach(report => {
+      report.transactions.forEach(t => {
+        if (t.category) cats.add(t.category);
+      });
+    });
+    // Add categories from current analysis
+    transactions.forEach(t => {
+      if (t.category) cats.add(t.category);
+    });
+    return Array.from(cats).sort();
+  }, [savedReports, transactions]);
   const [reportName, setReportName] = useState("");
   const [currentReport, setCurrentReport] = useState<SavedReport | null>(null);
   const [compareReport, setCompareReport] = useState<SavedReport | null>(null);
@@ -670,6 +685,7 @@ const App: React.FC = () => {
               transactions={transactions}
               onEditCategory={handleEditTransactionCategory}
               onEditDiscretionary={handleEditDiscretionary}
+              availableCategories={allCategories}
             />
 
             {savedReports.length > 1 && (
