@@ -47,6 +47,43 @@ const ProcessingBar: React.FC<{ progress: number }> = ({ progress }) => (
   </div>
 );
 
+const NavigationBar: React.FC<{ activeTab: AppState | null, onTabChange: (tab: AppState) => void, disabled?: boolean }> = ({ activeTab, onTabChange, disabled }) => {
+  const tabs = [
+    { id: AppState.IDLE, label: 'Import', icon: 'fa-file-import' },
+    { id: AppState.MONTHLY_VIEW, label: 'Monthly View', icon: 'fa-table-list' },
+    { id: AppState.MID_MONTH_VIEW, label: 'Mid-Month View', icon: 'fa-calendar-day' },
+    { id: AppState.TREND_ANALYSIS, label: 'Trends', icon: 'fa-chart-line' },
+    { id: AppState.PERIOD_DASHBOARD, label: 'Period Dashboard', icon: 'fa-gauge-high' },
+    { id: AppState.REPORTS, label: 'Reports', icon: 'fa-clock-rotate-left' },
+  ];
+
+  return (
+    <nav className="bg-white border-b border-slate-200 sticky top-20 z-[90]">
+      <div className="max-w-6xl mx-auto px-4">
+        <div className="flex overflow-x-auto no-scrollbar gap-8">
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => onTabChange(tab.id)}
+                disabled={disabled}
+                className={`flex items-center gap-2 py-4 px-1 border-b-2 transition-all whitespace-nowrap text-sm font-bold uppercase tracking-tight ${isActive
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+                  } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+              >
+                <i className={`fa-solid ${tab.icon} text-xs`}></i>
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </nav>
+  );
+};
+
 const App: React.FC = () => {
   const [status, setStatus] = useState<AppState>(AppState.IDLE);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -392,18 +429,18 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen pb-20">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-[100]">
         <div className="max-w-6xl mx-auto px-4 h-20 flex items-center justify-between">
-          <div className="flex items-center cursor-pointer h-full py-2" onClick={reset}>
+          <div className="flex items-center cursor-pointer h-full py-2" onClick={() => { reset(); setStatus(AppState.IDLE); }}>
             <img src="/logo.jpg" alt="SpendWise Logo" className="h-20 w-auto object-contain rounded-xl shadow-sm border border-slate-50" />
           </div>
           <div className="flex items-center gap-4">
             {status !== AppState.IDLE && (
               <button
-                onClick={reset}
+                onClick={() => setStatus(AppState.IDLE)}
                 className="text-sm text-slate-600 hover:text-slate-900 font-medium px-4 py-2 flex items-center gap-2"
               >
-                <i className="fa-solid fa-arrow-left"></i>
+                <i className="fa-solid fa-house"></i>
                 Home
               </button>
             )}
@@ -418,155 +455,136 @@ const App: React.FC = () => {
         </div>
       </header>
 
+      <NavigationBar
+        activeTab={
+          status === AppState.PARSING || status === AppState.ANALYZING ? AppState.IDLE :
+            status === AppState.COMPLETED || status === AppState.COMPARING ? null : status
+        }
+        onTabChange={(tab) => {
+          if (tab === AppState.IDLE) {
+            reset();
+          } else {
+            setStatus(tab);
+          }
+        }}
+        disabled={status === AppState.PARSING || status === AppState.ANALYZING}
+      />
+
       <main className="max-w-6xl mx-auto px-4 pt-10">
         {status === AppState.IDLE && (
-          <div className="max-w-5xl mx-auto">
+          <div className="max-w-2xl mx-auto">
             <div className="text-center mb-12">
-              <h2 className="text-4xl font-extrabold text-slate-900 mb-4">Financial Insight Hub</h2>
-              <p className="text-lg text-slate-600 leading-relaxed max-w-2xl mx-auto">
-                Take control of your finances. Import new data for AI analysis or dive deep into your spending trends across time.
+              <h2 className="text-4xl font-extrabold text-slate-900 mb-4 tracking-tight">Direct Import</h2>
+              <p className="text-lg text-slate-600 leading-relaxed max-w-xl mx-auto">
+                Upload a new CSV statement to classify transactions with Gemini AI.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
-              {/* Action Pillar 1: Import */}
-              <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center text-center">
-                <div className="w-24 h-24 mb-4">
-                  <img src="/import-hero.jpg" alt="Import Icon" className="w-full h-full object-contain rounded-2xl shadow-sm border border-slate-50" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-800 mb-2">Direct Import</h3>
-                <p className="text-slate-500 text-sm mb-8">
-                  Upload a new CSV statement to classify transactions with Gemini AI.
-                </p>
-                <div className="w-full">
-                  <FileUpload onFileSelect={handleFileUpload} disabled={status !== AppState.IDLE} />
-                </div>
+            <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center text-center">
+              <div className="w-24 h-24 mb-6">
+                <img src="/import-hero.jpg" alt="Import Icon" className="w-full h-full object-contain rounded-2xl shadow-sm border border-slate-50" />
+              </div>
+              <div className="w-full">
+                <FileUpload onFileSelect={handleFileUpload} disabled={status !== AppState.IDLE} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {status === AppState.MONTHLY_VIEW && (
+          <MonthlySpreadsheet
+            reports={savedReports}
+            onBack={() => setStatus(AppState.IDLE)}
+            mode="calendar"
+            userId={session.user.id}
+          />
+        )}
+
+        {status === AppState.MID_MONTH_VIEW && (
+          <MonthlySpreadsheet
+            reports={savedReports}
+            onBack={() => setStatus(AppState.IDLE)}
+            mode="mid-month"
+            userId={session.user.id}
+          />
+        )}
+
+        {status === AppState.TREND_ANALYSIS && (
+          <TrendAnalysis
+            reports={savedReports}
+            onBack={() => setStatus(AppState.IDLE)}
+          />
+        )}
+
+        {status === AppState.PERIOD_DASHBOARD && (
+          <div className="max-w-5xl mx-auto">
+            <div className="flex flex-col md:flex-row justify-between items-center mb-12 gap-6">
+              <div className="text-center md:text-left">
+                <h2 className="text-4xl font-extrabold text-slate-900 mb-2 tracking-tight">Period Dashboard</h2>
+                <p className="text-slate-500">Select a period to view aggregated insights</p>
               </div>
 
-              {/* Action Pillar 2: Analysis */}
-              <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm flex flex-col h-full">
-                <div className="flex flex-col items-center text-center flex-1">
-                  <div className="w-24 h-24 mb-4">
-                    <img src="/analysis-hero.jpg" alt="Analysis Icon" className="w-full h-full object-contain rounded-2xl shadow-sm border border-slate-50" />
-                  </div>
-                  <h3 className="text-xl font-bold text-slate-800 mb-2">Global Analysis</h3>
-                  <p className="text-slate-500 text-sm mb-8">
-                    View your entire spending history in a high-density spreadsheet format.
-                  </p>
-                </div>
+              <div className="bg-white p-2 rounded-2xl border border-slate-100 shadow-sm flex gap-2 overflow-x-auto no-scrollbar max-w-md md:max-w-none">
+                {getUniqueMonthsFromReports(savedReports).slice(0, 5).map(period => {
+                  const isMidMonth = period.endsWith(' (Mid-Month)');
+                  const mode = isMidMonth ? 'mid-month' : 'calendar';
+                  const label = period.replace(' (Mid-Month)', '');
+                  const isSelected = selectedPeriod === label && selectedPeriodMode === mode;
 
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <button
-                    onClick={() => setShowPeriodSelector(!showPeriodSelector)}
-                    disabled={savedReports.length === 0}
-                    className={`aspect-square group p-4 rounded-3xl border flex flex-col items-center justify-center text-center transition-all hover:scale-[1.02] shadow-sm disabled:opacity-50 ${showPeriodSelector ? 'bg-indigo-100 border-indigo-300 ring-2 ring-indigo-200' : 'bg-indigo-50 border-indigo-100'
-                      }`}
-                  >
-                    <div className="w-12 h-12 bg-indigo-500 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-sm">
-                      <i className="fa-solid fa-chart-line text-white text-xl"></i>
-                    </div>
-                    <div className="space-y-1 text-center">
-                      <p className="font-bold text-indigo-900 text-sm leading-tight">Period Dashboard</p>
-                      <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest leading-none">Aggregated</p>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => setStatus(AppState.MONTHLY_VIEW)}
-                    disabled={savedReports.length === 0}
-                    className="aspect-square group p-4 rounded-3xl bg-emerald-50 border border-emerald-100 flex flex-col items-center justify-center text-center transition-all hover:scale-[1.02] shadow-sm disabled:opacity-50 disabled:grayscale"
-                  >
-                    <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-sm">
-                      <i className="fa-solid fa-table-list text-white text-xl"></i>
-                    </div>
-                    <div className="space-y-1 text-center">
-                      <p className="font-bold text-emerald-900 text-sm leading-tight">Calendar View</p>
-                      <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest leading-none">Monthly</p>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => setStatus(AppState.MID_MONTH_VIEW)}
-                    disabled={savedReports.length === 0}
-                    className="aspect-square group p-4 rounded-3xl bg-amber-50 border border-amber-100 flex flex-col items-center justify-center text-center transition-all hover:scale-[1.02] shadow-sm disabled:opacity-50 disabled:grayscale"
-                  >
-                    <div className="w-12 h-12 bg-amber-400 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-sm">
-                      <i className="fa-solid fa-calendar-day text-white text-xl"></i>
-                    </div>
-                    <div className="space-y-1 text-center">
-                      <p className="font-bold text-amber-900 text-sm leading-tight">Mid-Month View</p>
-                      <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest leading-none">15th Cycle</p>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => setStatus(AppState.TREND_ANALYSIS)}
-                    disabled={savedReports.length === 0}
-                    className="aspect-square group p-4 rounded-3xl bg-rose-50 border border-rose-100 flex flex-col items-center justify-center text-center transition-all hover:scale-[1.02] shadow-sm disabled:opacity-50 disabled:grayscale"
-                  >
-                    <div className="w-12 h-12 bg-rose-500 rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-sm">
-                      <i className="fa-solid fa-arrow-trend-up text-white text-xl"></i>
-                    </div>
-                    <div className="space-y-1 text-center">
-                      <p className="font-bold text-rose-900 text-sm leading-tight">Trend Analysis</p>
-                      <p className="text-[10px] font-bold text-rose-400 uppercase tracking-widest leading-none">View Trends</p>
-                    </div>
-                  </button>
-                </div>
-
-                {showPeriodSelector && (
-                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 animate-in slide-in-from-top duration-300 mb-4">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase mb-3 text-center">Select Aggregation Period</p>
-                    <div className="max-h-48 overflow-y-auto space-y-2 pr-2 custom-scrollbar focus:outline-none">
-                      {getUniqueMonthsFromReports(savedReports).map(period => {
-                        const isMidMonth = period.endsWith(' (Mid-Month)');
-                        const mode = isMidMonth ? 'mid-month' : 'calendar';
-                        const label = period.replace(' (Mid-Month)', '');
-
-                        return (
-                          <button
-                            key={period}
-                            onClick={() => handleViewPeriodDashboard(label, mode)}
-                            className={`w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between group/period ${isMidMonth
-                              ? 'bg-indigo-50/50 border-indigo-100 hover:border-indigo-300 hover:bg-indigo-50'
-                              : 'bg-white border-slate-200 hover:border-blue-300 hover:bg-blue-50/30'
-                              }`}
-                          >
-                            <div>
-                              <p className="text-xs font-black text-slate-800 tracking-tight">{label}</p>
-                              <p className={`text-[9px] font-bold uppercase tracking-wider mt-0.5 ${isMidMonth ? 'text-indigo-400' : 'text-slate-400'}`}>
-                                {isMidMonth ? 'Mid-Month Cycle' : 'Calendar Month'}
-                              </p>
-                            </div>
-                            <i className={`fa-solid fa-chevron-right text-[10px] opacity-0 group-hover/period:opacity-100 transition-all ${isMidMonth ? 'text-indigo-300' : 'text-blue-300'}`}></i>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {savedReports.length === 0 && (
-                  <p className="text-center text-[10px] text-slate-400 font-bold mt-4 uppercase tracking-widest">
-                    Upload a report to unlock analysis
-                  </p>
-                )}
+                  return (
+                    <button
+                      key={period}
+                      onClick={() => handleViewPeriodDashboard(label, mode)}
+                      className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${isSelected
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-md'
+                        : 'bg-slate-50 text-slate-500 border-slate-100 hover:bg-white hover:border-blue-200'
+                        }`}
+                    >
+                      {label} {isMidMonth ? 'MM' : 'Cal'}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="pt-12 border-t border-slate-100">
-              <div className="flex items-center gap-2 mb-8">
-                <i className="fa-solid fa-clock-rotate-left text-slate-400"></i>
-                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Recent Reports</h3>
-              </div>
-              <ReportHistory
-                reports={savedReports}
-                onSelect={handleSelectReport}
-                onDelete={handleDeleteReport}
-                onCompare={handleCompareTrigger}
-                selectedForComparison={currentReport?.id || null}
+            {selectedPeriod ? (
+              <PeriodDashboard
+                transactions={aggregatedTransactions}
+                periodName={selectedPeriod}
+                periodKey={selectedPeriod}
+                mode={selectedPeriodMode}
+                onUpdateBudget={handleUpdateBudget}
+                budgetAmount={currentBudget}
+                onBack={() => setStatus(AppState.IDLE)}
+                allReports={savedReports}
               />
+            ) : (
+              <div className="bg-slate-50 rounded-3xl p-20 text-center border-2 border-dashed border-slate-200">
+                <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <i className="fa-solid fa-gauge-high text-blue-400 text-3xl"></i>
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-2">No Period Selected</h3>
+                <p className="text-slate-500 max-w-sm mx-auto mb-8">Choose a month or mid-month cycle from the menu above to see aggregated results.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {status === AppState.REPORTS && (
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-12">
+              <h2 className="text-4xl font-extrabold text-slate-900 mb-4 tracking-tight">Report History</h2>
+              <p className="text-lg text-slate-600 leading-relaxed max-w-xl mx-auto">
+                Review and compare your previously analyzed statements.
+              </p>
             </div>
+            <ReportHistory
+              reports={savedReports}
+              onSelect={handleSelectReport}
+              onDelete={handleDeleteReport}
+              onCompare={handleCompareTrigger}
+              selectedForComparison={currentReport?.id || null}
+            />
           </div>
         )}
 
@@ -711,46 +729,6 @@ const App: React.FC = () => {
               </button>
             </div>
             <ComparisonView reportA={currentReport} reportB={compareReport} />
-          </div>
-        )}
-        {status === AppState.MONTHLY_VIEW && (
-          <div className="animate-in fade-in slide-in-from-bottom duration-500">
-            <MonthlySpreadsheet
-              reports={savedReports}
-              onBack={() => setStatus(AppState.IDLE)}
-              mode="calendar"
-              userId={session?.user?.id}
-            />
-          </div>
-        )}
-        {status === AppState.MID_MONTH_VIEW && (
-          <div className="animate-in fade-in slide-in-from-bottom duration-500">
-            <MonthlySpreadsheet
-              reports={savedReports}
-              onBack={() => setStatus(AppState.IDLE)}
-              mode="mid-month"
-              userId={session?.user?.id}
-            />
-          </div>
-        )}
-        {status === AppState.PERIOD_DASHBOARD && (
-          <PeriodDashboard
-            transactions={aggregatedTransactions}
-            periodName={selectedPeriod}
-            periodKey={selectedPeriod}
-            mode={selectedPeriodMode!}
-            onBack={() => setStatus(AppState.IDLE)}
-            budgetAmount={currentBudget}
-            onUpdateBudget={(amt) => handleUpdateBudget(amt)}
-            allReports={savedReports}
-          />
-        )}
-        {status === AppState.TREND_ANALYSIS && (
-          <div className="animate-in fade-in slide-in-from-bottom duration-500">
-            <TrendAnalysis
-              reports={savedReports}
-              onBack={() => setStatus(AppState.IDLE)}
-            />
           </div>
         )}
       </main>
