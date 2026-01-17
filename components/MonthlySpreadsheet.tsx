@@ -10,7 +10,10 @@ const SpreadsheetTooltip: React.FC<{
     position: { x: number; y: number };
     onMouseEnter: () => void;
     onMouseLeave: () => void;
-}> = ({ title, total, transactions, position, onMouseEnter, onMouseLeave }) => {
+    onEditDate?: (id: string, newDate: string) => void;
+    onDeleteTransaction?: (id: string) => void;
+}> = ({ title, total, transactions, position, onMouseEnter, onMouseLeave, onEditDate, onDeleteTransaction }) => {
+    const [editingDateId, setEditingDateId] = React.useState<string | null>(null);
     // Breakdown totals
     const { outflows, inflows } = transactions.reduce((acc, t) => {
         if (t.amount < 0) acc.outflows += t.amount;
@@ -23,10 +26,11 @@ const SpreadsheetTooltip: React.FC<{
 
     return (
         <div
-            className="fixed z-[9999] bg-white p-5 rounded-2xl shadow-2xl border border-slate-200 min-w-[320px] animate-in fade-in zoom-in duration-150 pointer-events-auto"
+            className="fixed z-[9999] bg-white p-5 rounded-2xl shadow-2xl border border-slate-200 min-w-[320px] animate-in fade-in zoom-in-95 duration-200 pointer-events-auto m-0"
             style={{
-                left: Math.min(position.x + 20, window.innerWidth - 340),
-                top: Math.min(position.y + 20, window.innerHeight - 400)
+                left: Math.max(10, Math.min(position.x, window.innerWidth - 340)),
+                top: Math.min(position.y - 8, window.innerHeight - 420),
+                marginTop: 0 // Explicitly ensure no margin interferes
             }}
             onMouseEnter={onMouseEnter}
             onMouseLeave={onMouseLeave}
@@ -59,11 +63,52 @@ const SpreadsheetTooltip: React.FC<{
                             <div key={t.id || idx} className="flex justify-between items-start gap-4 mb-3 last:mb-0 border-l-2 pl-3 border-transparent hover:border-slate-100 transition-colors">
                                 <div className="flex-1">
                                     <p className="text-[11px] font-bold text-slate-700 leading-tight line-clamp-1">{t.description}</p>
-                                    <p className="text-[9px] text-slate-400 font-medium">{t.date}</p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        {editingDateId === t.id ? (
+                                            <input
+                                                type="date"
+                                                defaultValue={t.date}
+                                                onBlur={(e) => {
+                                                    onEditDate?.(t.id, e.target.value);
+                                                    setEditingDateId(null);
+                                                }}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        onEditDate?.(t.id, (e.target as HTMLInputElement).value);
+                                                        setEditingDateId(null);
+                                                    }
+                                                }}
+                                                className="text-[10px] border border-blue-300 rounded px-1 outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                                                autoFocus
+                                            />
+                                        ) : (
+                                            <span
+                                                onClick={() => onEditDate && setEditingDateId(t.id)}
+                                                className={`text-[9px] font-medium ${onEditDate ? "text-slate-400 hover:text-blue-600 cursor-pointer hover:bg-blue-50 px-1 rounded transition-colors" : "text-slate-400"}`}
+                                            >
+                                                {t.date}
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
-                                <span className={`text-[11px] font-black whitespace-nowrap ${isOutflow ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                    {isOutflow ? '-' : '+'}${Math.abs(t.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                </span>
+                                <div className="flex flex-col items-end gap-1">
+                                    <span className={`text-[11px] font-black whitespace-nowrap ${isOutflow ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                        {isOutflow ? '-' : '+'}${Math.abs(t.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                    </span>
+                                    {onDeleteTransaction && (
+                                        <button
+                                            onClick={() => {
+                                                if (window.confirm("Delete this transaction?")) {
+                                                    onDeleteTransaction(t.id);
+                                                }
+                                            }}
+                                            className="text-[10px] text-slate-300 hover:text-rose-600 transition-colors opacity-0 group-hover:opacity-100 p-1"
+                                            title="Delete"
+                                        >
+                                            <i className="fa-solid fa-trash-can"></i>
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         );
                     })}
@@ -78,9 +123,11 @@ interface MonthlySpreadsheetProps {
     onBack: () => void;
     mode?: 'calendar' | 'mid-month';
     userId?: string;
+    onEditDate?: (id: string, newDate: string) => void;
+    onDeleteTransaction?: (id: string) => void;
 }
 
-const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack, mode = 'calendar', userId }) => {
+const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack, mode = 'calendar', userId, onEditDate, onDeleteTransaction }) => {
     const [activeTooltip, setActiveTooltip] = React.useState<{
         title: string;
         total: number;
@@ -113,7 +160,7 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
         clearTooltipTimer();
         closeTimeout.current = setTimeout(() => {
             setActiveTooltip(null);
-        }, 150);
+        }, 500);
     };
     React.useEffect(() => {
         if (userId) {
@@ -393,13 +440,14 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                                                 key={month}
                                                 className={`p-4 text-sm font-black text-right transition-colors ${val > 0 ? varianceStyle : 'text-slate-300'} hover:bg-emerald-100/50 cursor-help relative`}
                                                 onMouseEnter={(e) => {
+                                                    const rect = e.currentTarget.getBoundingClientRect();
                                                     if (val > 0) {
                                                         clearTooltipTimer();
                                                         setActiveTooltip({
                                                             title: `${cat} - ${month}`,
                                                             total: val,
                                                             transactions: cell.transactions,
-                                                            position: { x: e.clientX, y: e.clientY }
+                                                            position: { x: rect.left, y: rect.bottom }
                                                         });
                                                     }
                                                 }}
@@ -480,13 +528,14 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                                                 key={month}
                                                 className={`p-4 text-sm font-black text-right transition-colors ${val < 0 ? varianceStyle : 'text-slate-300'} hover:bg-red-100/50 cursor-help relative`}
                                                 onMouseEnter={(e) => {
+                                                    const rect = e.currentTarget.getBoundingClientRect();
                                                     if (val < 0) {
                                                         clearTooltipTimer();
                                                         setActiveTooltip({
                                                             title: `${cat} - ${month}`,
                                                             total: val,
                                                             transactions: cell.transactions,
-                                                            position: { x: e.clientX, y: e.clientY }
+                                                            position: { x: rect.left, y: rect.bottom }
                                                         });
                                                     }
                                                 }}
@@ -554,6 +603,8 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                     {...activeTooltip}
                     onMouseEnter={clearTooltipTimer}
                     onMouseLeave={startTooltipTimer}
+                    onEditDate={onEditDate}
+                    onDeleteTransaction={onDeleteTransaction}
                 />
             )}
         </div>

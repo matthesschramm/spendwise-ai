@@ -314,6 +314,48 @@ const App: React.FC = () => {
     }
   };
 
+  const handleEditDate = (txId: string, newDate: string) => {
+    const updatedTransactions = transactions.map(t =>
+      t.id === txId ? { ...t, date: newDate } : t
+    );
+    setTransactions(updatedTransactions);
+
+    if (currentReport) {
+      const updatedReport: SavedReport = {
+        ...currentReport,
+        transactions: updatedTransactions
+      };
+      setCurrentReport(updatedReport);
+
+      if (session) {
+        storageService.saveReport(updatedReport, session.user.id)
+          .catch(err => console.error('Failed to save report after date edit:', err));
+      }
+    }
+  };
+
+  const handleDeleteTransaction = (txId: string) => {
+    const updatedTransactions = transactions.filter(t => t.id !== txId);
+    setTransactions(updatedTransactions);
+
+    if (currentReport) {
+      const updatedReport: SavedReport = {
+        ...currentReport,
+        transactions: updatedTransactions,
+        totalSpent: updatedTransactions.reduce((acc, t) => acc + (t.amount < 0 ? Math.abs(t.amount) : 0), 0)
+      };
+      setCurrentReport(updatedReport);
+
+      // Also update savedReports to keep the history in sync
+      setSavedReports(prev => prev.map(r => r.id === updatedReport.id ? updatedReport : r));
+
+      if (session) {
+        storageService.saveReport(updatedReport, session.user.id)
+          .catch(err => console.error('Failed to save report after deletion:', err));
+      }
+    }
+  };
+
   const handleSelectReport = async (report: SavedReport) => {
     console.log(`Selecting report: ${report.name}`, report);
     if (!report.transactions || report.transactions.length === 0) {
@@ -497,6 +539,8 @@ const App: React.FC = () => {
             onBack={() => setStatus(AppState.IDLE)}
             mode="calendar"
             userId={session.user.id}
+            onEditDate={handleEditDate}
+            onDeleteTransaction={handleDeleteTransaction}
           />
         )}
 
@@ -506,6 +550,8 @@ const App: React.FC = () => {
             onBack={() => setStatus(AppState.IDLE)}
             mode="mid-month"
             userId={session.user.id}
+            onEditDate={handleEditDate}
+            onDeleteTransaction={handleDeleteTransaction}
           />
         )}
 
@@ -703,6 +749,8 @@ const App: React.FC = () => {
               transactions={transactions}
               onEditCategory={handleEditTransactionCategory}
               onEditDiscretionary={handleEditDiscretionary}
+              onEditDate={handleEditDate}
+              onDeleteTransaction={handleDeleteTransaction}
               availableCategories={allCategories}
             />
 

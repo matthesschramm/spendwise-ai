@@ -21,6 +21,8 @@ interface TransactionListProps {
   transactions: Transaction[];
   onEditCategory?: (id: string, newCategory: string) => void;
   onEditDiscretionary?: (id: string, isDiscretionary: boolean) => void;
+  onEditDate?: (id: string, newDate: string) => void;
+  onDeleteTransaction?: (id: string) => void;
   availableCategories?: string[];
 }
 
@@ -28,9 +30,12 @@ const TransactionList: React.FC<TransactionListProps> = ({
   transactions,
   onEditCategory,
   onEditDiscretionary,
+  onEditDate,
+  onDeleteTransaction,
   availableCategories = COMMON_CATEGORIES
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingDateId, setEditingDateId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
 
   const handleCategoryChange = (id: string, newValue: string) => {
@@ -54,6 +59,19 @@ const TransactionList: React.FC<TransactionListProps> = ({
     setEditValue("");
   };
 
+  const handleDateChange = (id: string, newDate: string) => {
+    if (onEditDate) {
+      onEditDate(id, newDate);
+    }
+    setEditingDateId(null);
+  };
+
+  const handleDelete = (id: string) => {
+    if (onDeleteTransaction && window.confirm("Are you sure you want to delete this transaction?")) {
+      onDeleteTransaction(id);
+    }
+  };
+
   return (
     <div className="bg-white mt-8 rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
       <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
@@ -72,12 +90,31 @@ const TransactionList: React.FC<TransactionListProps> = ({
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Type</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Amount</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">AI Insight</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {transactions.map((t) => (
-              <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                <td className="px-6 py-4 text-sm text-slate-600">{t.date}</td>
+              <tr key={t.id} className="hover:bg-slate-50 transition-colors group">
+                <td className="px-6 py-4 text-sm text-slate-600">
+                  {editingDateId === t.id ? (
+                    <input
+                      type="date"
+                      defaultValue={t.date}
+                      onBlur={(e) => handleDateChange(t.id, e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleDateChange(t.id, (e.target as HTMLInputElement).value)}
+                      className="text-xs border border-blue-300 rounded px-2 py-1 outline-none focus:ring-2 focus:ring-blue-500"
+                      autoFocus
+                    />
+                  ) : (
+                    <span
+                      onClick={() => onEditDate && setEditingDateId(t.id)}
+                      className={onEditDate ? "cursor-pointer hover:text-blue-600 hover:bg-blue-50 px-1 rounded transition-colors" : ""}
+                    >
+                      {t.date}
+                    </span>
+                  )}
+                </td>
                 <td className="px-6 py-4">
                   <span className="text-sm font-medium text-slate-800 line-clamp-1" title={t.description}>{t.description}</span>
                 </td>
@@ -144,6 +181,15 @@ const TransactionList: React.FC<TransactionListProps> = ({
                   ) : (
                     <span className="text-xs text-slate-400 italic">Direct Identification</span>
                   )}
+                </td>
+                <td className="px-6 py-4 text-right">
+                  <button
+                    onClick={() => handleDelete(t.id)}
+                    className="text-slate-400 hover:text-red-600 transition-colors p-2"
+                    title="Delete Transaction"
+                  >
+                    <i className="fa-solid fa-trash-can"></i>
+                  </button>
                 </td>
               </tr>
             ))}
