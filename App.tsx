@@ -311,38 +311,79 @@ const App: React.FC = () => {
   }, [session]);
 
   const handleEditTransactionCategory = (txId: string, newCategory: string) => {
-    const transaction = transactions.find(t => t.id === txId);
-    if (!transaction) return;
+    const normalizedCategory = newCategory.trim();
+    if (!normalizedCategory) return;
 
     // Apply global discretionary setting for the NEW category if it exists
-    const globalDiscretionary = categorySettings[newCategory];
+    const globalDiscretionary = categorySettings[normalizedCategory];
+    const updateTransactionCategory = (t: Transaction) => ({
+      ...t,
+      category: normalizedCategory,
+      discretionary: globalDiscretionary !== undefined ? globalDiscretionary : t.discretionary
+    });
 
-    const updatedTransactions = transactions.map(t =>
-      t.id === txId ? {
-        ...t,
-        category: newCategory,
-        discretionary: globalDiscretionary !== undefined ? globalDiscretionary : t.discretionary
-      } : t
-    );
-    setTransactions(updatedTransactions);
+    let didUpdate = false;
+    let matchedReport: SavedReport | null = null;
 
-    // If we're looking at a saved report, we mark it as modified in the UI state
-    if (currentReport) {
+    const transactionInState = transactions.find(t => t.id === txId);
+    const transactionInReports = savedReports
+      .find(report => report.transactions.some(t => t.id === txId))
+      ?.transactions.find(t => t.id === txId);
+    const transactionForRule = transactionInState || transactionInReports;
+
+    const updatedSavedReports = savedReports.map(report => {
+      let reportChanged = false;
+      const updatedReportTransactions = report.transactions.map(t => {
+        if (t.id !== txId) return t;
+        if ((t.category || 'Other') === normalizedCategory) return t;
+        reportChanged = true;
+        didUpdate = true;
+        return updateTransactionCategory(t);
+      });
+
+      if (!reportChanged) return report;
       const updatedReport = {
-        ...currentReport,
-        transactions: updatedTransactions,
-        totalSpent: updatedTransactions.reduce((acc, t) => acc + (t.amount < 0 ? Math.abs(t.amount) : 0), 0)
+        ...report,
+        transactions: updatedReportTransactions,
+        totalSpent: updatedReportTransactions.reduce((acc, t) => acc + (t.amount < 0 ? Math.abs(t.amount) : 0), 0)
       };
-      setCurrentReport(updatedReport);
-      setSavedReports(prevReports =>
-        prevReports.map(r => r.id === updatedReport.id ? updatedReport : r)
+      matchedReport = updatedReport;
+      return updatedReport;
+    });
+
+    if (matchedReport) {
+      setSavedReports(updatedSavedReports);
+      if (currentReport?.id === matchedReport.id) {
+        setCurrentReport(matchedReport);
+        setTransactions(matchedReport.transactions);
+      }
+      scheduleReportAutosave(matchedReport);
+    } else if (transactionInState) {
+      if ((transactionInState.category || 'Other') === normalizedCategory) return;
+      didUpdate = true;
+      const updatedTransactions = transactions.map(t =>
+        t.id === txId ? updateTransactionCategory(t) : t
       );
-      scheduleReportAutosave(updatedReport);
+      setTransactions(updatedTransactions);
+
+      // If we're looking at a saved report, we mark it as modified in the UI state
+      if (currentReport) {
+        const updatedReport = {
+          ...currentReport,
+          transactions: updatedTransactions,
+          totalSpent: updatedTransactions.reduce((acc, t) => acc + (t.amount < 0 ? Math.abs(t.amount) : 0), 0)
+        };
+        setCurrentReport(updatedReport);
+        setSavedReports(prevReports =>
+          prevReports.map(r => r.id === updatedReport.id ? updatedReport : r)
+        );
+        scheduleReportAutosave(updatedReport);
+      }
     }
 
     // SpendWise Learning Loop: Persist this preference to Supabase
-    if (session && transaction) {
-      storageService.saveUserRule(session.user.id, transaction.description, newCategory)
+    if (session && transactionForRule && didUpdate) {
+      storageService.saveUserRule(session.user.id, transactionForRule.description, normalizedCategory)
         .catch(err => console.error('Failed to save learning rule:', err));
     }
   };
@@ -638,6 +679,8 @@ const App: React.FC = () => {
             userId={session.user.id}
             onEditDate={handleEditDate}
             onDeleteTransaction={handleDeleteTransaction}
+            onEditCategory={handleEditTransactionCategory}
+            availableCategories={allCategories}
           />
         )}
 
@@ -649,6 +692,8 @@ const App: React.FC = () => {
             userId={session.user.id}
             onEditDate={handleEditDate}
             onDeleteTransaction={handleDeleteTransaction}
+            onEditCategory={handleEditTransactionCategory}
+            availableCategories={allCategories}
           />
         )}
 

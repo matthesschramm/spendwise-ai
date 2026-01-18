@@ -12,8 +12,12 @@ const SpreadsheetTooltip: React.FC<{
     onMouseLeave: () => void;
     onEditDate?: (id: string, newDate: string) => void;
     onDeleteTransaction?: (id: string) => void;
-}> = ({ title, total, transactions, position, onMouseEnter, onMouseLeave, onEditDate, onDeleteTransaction }) => {
+    onEditCategory?: (id: string, newCategory: string) => void;
+    availableCategories?: string[];
+}> = ({ title, total, transactions, position, onMouseEnter, onMouseLeave, onEditDate, onDeleteTransaction, onEditCategory, availableCategories = ['Other'] }) => {
     const [editingDateId, setEditingDateId] = React.useState<string | null>(null);
+    const [editingCategoryId, setEditingCategoryId] = React.useState<string | null>(null);
+    const [editCategoryValue, setEditCategoryValue] = React.useState("");
     // Breakdown totals
     const { outflows, inflows } = transactions.reduce((acc, t) => {
         if (t.amount < 0) acc.outflows += t.amount;
@@ -23,6 +27,28 @@ const SpreadsheetTooltip: React.FC<{
 
     // Show all transactions sorted by magnitude
     const sorted = [...transactions].sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
+
+    const handleCategoryChange = (id: string, newValue: string) => {
+        if (newValue === "Other") {
+            setEditingCategoryId(id);
+            setEditCategoryValue("");
+            return;
+        }
+
+        if (onEditCategory) {
+            onEditCategory(id, newValue);
+        }
+        setEditingCategoryId(null);
+    };
+
+    const handleCustomCategoryBlur = (id: string) => {
+        const trimmed = editCategoryValue.trim();
+        if (trimmed && onEditCategory) {
+            onEditCategory(id, trimmed);
+        }
+        setEditingCategoryId(null);
+        setEditCategoryValue("");
+    };
 
     return (
         <div
@@ -90,6 +116,30 @@ const SpreadsheetTooltip: React.FC<{
                                             </span>
                                         )}
                                     </div>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        {editingCategoryId === t.id ? (
+                                            <input
+                                                type="text"
+                                                value={editCategoryValue}
+                                                placeholder="Type category..."
+                                                onChange={(e) => setEditCategoryValue(e.target.value)}
+                                                onBlur={() => handleCustomCategoryBlur(t.id)}
+                                                onKeyDown={(e) => e.key === 'Enter' && handleCustomCategoryBlur(t.id)}
+                                                className="text-[10px] border border-blue-300 rounded px-1 py-0.5 w-32 focus:ring-1 focus:ring-blue-500 outline-none"
+                                                autoFocus
+                                            />
+                                        ) : (
+                                            <select
+                                                value={t.category || "Other"}
+                                                onChange={(e) => handleCategoryChange(t.id, e.target.value)}
+                                                className={`text-[10px] border border-transparent hover:border-slate-200 rounded px-1 py-0.5 outline-none cursor-pointer transition-colors font-medium ${onEditCategory ? 'text-blue-700 hover:bg-slate-100' : 'text-slate-400 pointer-events-none'}`}
+                                            >
+                                                {availableCategories.map(cat => (
+                                                    <option key={cat} value={cat}>{cat}</option>
+                                                ))}
+                                            </select>
+                                        )}
+                                    </div>
                                 </div>
                                 <div className="flex flex-col items-end gap-1">
                                     <span className={`text-[11px] font-black whitespace-nowrap ${isOutflow ? 'text-rose-600' : 'text-emerald-600'}`}>
@@ -125,9 +175,11 @@ interface MonthlySpreadsheetProps {
     userId?: string;
     onEditDate?: (id: string, newDate: string) => void;
     onDeleteTransaction?: (id: string) => void;
+    onEditCategory?: (id: string, newCategory: string) => void;
+    availableCategories?: string[];
 }
 
-const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack, mode = 'calendar', userId, onEditDate, onDeleteTransaction }) => {
+const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack, mode = 'calendar', userId, onEditDate, onDeleteTransaction, onEditCategory, availableCategories }) => {
     const [activeTooltip, setActiveTooltip] = React.useState<{
         title: string;
         total: number;
@@ -605,6 +657,8 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                     onMouseLeave={startTooltipTimer}
                     onEditDate={onEditDate}
                     onDeleteTransaction={onDeleteTransaction}
+                    onEditCategory={onEditCategory}
+                    availableCategories={availableCategories}
                 />
             )}
         </div>
