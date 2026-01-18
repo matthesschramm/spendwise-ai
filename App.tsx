@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Transaction, AppState, SavedReport } from './types';
 import FileUpload from './components/FileUpload';
 import Dashboard from './components/Dashboard';
@@ -121,6 +121,7 @@ const App: React.FC = () => {
   const [selectedPeriodMode, setSelectedPeriodMode] = useState<'calendar' | 'mid-month'>('calendar');
   const [aggregatedTransactions, setAggregatedTransactions] = useState<Transaction[]>([]);
   const [showPeriodSelector, setShowPeriodSelector] = useState(false);
+  const autosaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Auth listener
   useEffect(() => {
@@ -135,6 +136,14 @@ const App: React.FC = () => {
     });
 
     return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (autosaveTimeoutRef.current) {
+        clearTimeout(autosaveTimeoutRef.current);
+      }
+    };
   }, []);
 
   // Load history on mount
@@ -282,6 +291,25 @@ const App: React.FC = () => {
     }
   };
 
+  const scheduleReportAutosave = useCallback((report: SavedReport) => {
+    if (!session || !report?.id) return;
+
+    if (autosaveTimeoutRef.current) {
+      clearTimeout(autosaveTimeoutRef.current);
+    }
+
+    autosaveTimeoutRef.current = setTimeout(async () => {
+      try {
+        await storageService.saveReport(report, session.user.id);
+        setSavedReports(prevReports =>
+          prevReports.map(r => r.id === report.id ? report : r)
+        );
+      } catch (err: any) {
+        console.error('Autosave failed:', err);
+      }
+    }, 500);
+  }, [session]);
+
   const handleEditTransactionCategory = (txId: string, newCategory: string) => {
     const transaction = transactions.find(t => t.id === txId);
     if (!transaction) return;
@@ -300,11 +328,16 @@ const App: React.FC = () => {
 
     // If we're looking at a saved report, we mark it as modified in the UI state
     if (currentReport) {
-      setCurrentReport({
+      const updatedReport = {
         ...currentReport,
         transactions: updatedTransactions,
         totalSpent: updatedTransactions.reduce((acc, t) => acc + (t.amount < 0 ? Math.abs(t.amount) : 0), 0)
-      });
+      };
+      setCurrentReport(updatedReport);
+      setSavedReports(prevReports =>
+        prevReports.map(r => r.id === updatedReport.id ? updatedReport : r)
+      );
+      scheduleReportAutosave(updatedReport);
     }
 
     // SpendWise Learning Loop: Persist this preference to Supabase
