@@ -89,6 +89,7 @@ const App: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
+  const [categorySettings, setCategorySettings] = useState<Record<string, boolean>>({});
 
   const allCategories = useMemo(() => {
     const cats = new Set<string>(COMMON_CATEGORIES);
@@ -143,7 +144,14 @@ const App: React.FC = () => {
       const reports = await storageService.getAllReports(session.user.id);
       setSavedReports(reports);
     };
+
+    const loadSettings = async () => {
+      const settings = await storageService.getCategorySettings(session.user.id);
+      setCategorySettings(settings);
+    };
+
     loadReports();
+    loadSettings();
   }, [session]);
 
   const handleFileUpload = useCallback(async (csvText: string) => {
@@ -190,8 +198,16 @@ const App: React.FC = () => {
 
         // Update local list
         batch.forEach(newTx => {
-          const idx = currentParsedList.findIndex(t => t.id === newTx.id);
-          if (idx !== -1) currentParsedList[idx] = newTx;
+          // Merge with global discretionary settings for consistency
+          const cat = newTx.category || 'Other';
+          const globalDiscretionary = categorySettings[cat];
+          const syncTx = {
+            ...newTx,
+            discretionary: globalDiscretionary !== undefined ? globalDiscretionary : newTx.discretionary
+          };
+
+          const idx = currentParsedList.findIndex(t => t.id === syncTx.id);
+          if (idx !== -1) currentParsedList[idx] = syncTx;
         });
 
         // Create the fully updated report object
@@ -268,8 +284,17 @@ const App: React.FC = () => {
 
   const handleEditTransactionCategory = (txId: string, newCategory: string) => {
     const transaction = transactions.find(t => t.id === txId);
+    if (!transaction) return;
+
+    // Apply global discretionary setting for the NEW category if it exists
+    const globalDiscretionary = categorySettings[newCategory];
+
     const updatedTransactions = transactions.map(t =>
-      t.id === txId ? { ...t, category: newCategory } : t
+      t.id === txId ? {
+        ...t,
+        category: newCategory,
+        discretionary: globalDiscretionary !== undefined ? globalDiscretionary : t.discretionary
+      } : t
     );
     setTransactions(updatedTransactions);
 
@@ -293,23 +318,40 @@ const App: React.FC = () => {
     const transaction = transactions.find(t => t.id === txId);
     if (!transaction || !transaction.category) return;
 
-    // Update all transactions in this category for consistency
-    const updatedTransactions = transactions.map(t =>
-      t.category === transaction.category ? { ...t, discretionary: isDiscretionary } : t
+    const category = transaction.category;
+
+    // 1. Update active transactions list
+    const updatedTransactionsList = transactions.map(t =>
+      t.category === category ? { ...t, discretionary: isDiscretionary } : t
     );
+    setTransactions(updatedTransactionsList);
 
-    setTransactions(updatedTransactions);
-
+    // 2. Update current report object if it exists
     if (currentReport) {
       setCurrentReport({
         ...currentReport,
-        transactions: updatedTransactions
+        transactions: updatedTransactionsList
       });
     }
 
-    // SpendWise Learning Loop: Persist category setting to Supabase
+    // 3. CRITICAL: Update ALL saved reports in memory for global consistency
+    const updatedSavedReports = savedReports.map(report => ({
+      ...report,
+      transactions: report.transactions.map(t =>
+        t.category === category ? { ...t, discretionary: isDiscretionary } : t
+      )
+    }));
+    setSavedReports(updatedSavedReports);
+
+    // 4. Update local category settings state
+    setCategorySettings(prev => ({
+      ...prev,
+      [category]: isDiscretionary
+    }));
+
+    // 5. Persist global category setting to Supabase
     if (session) {
-      storageService.saveCategorySetting(session.user.id, transaction.category, isDiscretionary)
+      storageService.saveCategorySetting(session.user.id, category, isDiscretionary)
         .catch(err => console.error('Failed to save category setting:', err));
     }
   };
@@ -559,6 +601,8 @@ const App: React.FC = () => {
           <TrendAnalysis
             reports={savedReports}
             onBack={() => setStatus(AppState.IDLE)}
+            userId={session.user.id}
+            categorySettings={categorySettings}
           />
         )}
 

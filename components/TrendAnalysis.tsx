@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
     LineChart,
     Line,
@@ -10,11 +10,14 @@ import {
     Legend
 } from 'recharts';
 import { SavedReport } from '../types';
-import { aggregateTrendData } from '../utils/aggregationUtils';
+import { aggregateTrendData, getCategoryClassification } from '../utils/aggregationUtils';
+import { storageService } from '../services/storageService';
 
 interface TrendAnalysisProps {
     reports: SavedReport[];
     onBack: () => void;
+    userId?: string;
+    categorySettings?: Record<string, boolean>;
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -38,32 +41,30 @@ const getCategoryColor = (cat: string, index: number) => {
     return fallbackColors[index % fallbackColors.length];
 };
 
-const TrendAnalysis: React.FC<TrendAnalysisProps> = ({ reports, onBack }) => {
+const TrendAnalysis: React.FC<TrendAnalysisProps> = ({ reports, onBack, userId, categorySettings = {} }) => {
     const [viewMode, setViewMode] = useState<'calendar' | 'mid-month'>('calendar');
-    const trendData = useMemo(() => aggregateTrendData(reports, viewMode), [reports, viewMode]);
+
+    const classification = useMemo(() => getCategoryClassification(reports, categorySettings), [reports, categorySettings]);
+    const trendData = useMemo(() => aggregateTrendData(reports, viewMode, classification), [reports, viewMode, classification]);
     const [hiddenCategories, setHiddenCategories] = useState<Set<string>>(new Set());
 
     const categoriesByGroup = useMemo(() => {
-        const discretionary = new Set<string>();
-        const nonDiscretionary = new Set<string>();
+        const discretionary: string[] = [];
+        const nonDiscretionary: string[] = [];
 
-        reports.forEach(report => {
-            report.transactions.forEach(t => {
-                if (t.amount >= 0) return;
-                const cat = t.category || 'Other';
-                if (t.discretionary === false) {
-                    nonDiscretionary.add(cat);
-                } else {
-                    discretionary.add(cat);
-                }
-            });
+        Object.entries(classification).forEach(([cat, isDiscretionary]) => {
+            if (isDiscretionary) {
+                discretionary.push(cat);
+            } else {
+                nonDiscretionary.push(cat);
+            }
         });
 
         return {
-            discretionary: Array.from(discretionary),
-            nonDiscretionary: Array.from(nonDiscretionary)
+            discretionary,
+            nonDiscretionary
         };
-    }, [reports]);
+    }, [classification]);
 
     const toggleCategory = (cat: string) => {
         setHiddenCategories(prev => {
@@ -122,8 +123,8 @@ const TrendAnalysis: React.FC<TrendAnalysisProps> = ({ reports, onBack }) => {
                         <button
                             onClick={() => setViewMode('calendar')}
                             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${viewMode === 'calendar'
-                                    ? 'bg-white text-slate-900 shadow-sm'
-                                    : 'text-slate-500 hover:text-slate-700'
+                                ? 'bg-white text-slate-900 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-700'
                                 }`}
                         >
                             <i className="fa-solid fa-calendar-days mr-2"></i>
@@ -132,8 +133,8 @@ const TrendAnalysis: React.FC<TrendAnalysisProps> = ({ reports, onBack }) => {
                         <button
                             onClick={() => setViewMode('mid-month')}
                             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${viewMode === 'mid-month'
-                                    ? 'bg-white text-slate-900 shadow-sm'
-                                    : 'text-slate-500 hover:text-slate-700'
+                                ? 'bg-white text-slate-900 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-700'
                                 }`}
                         >
                             <i className="fa-solid fa-arrows-left-right mr-2"></i>

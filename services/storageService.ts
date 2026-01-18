@@ -33,18 +33,28 @@ export const storageService = {
       return [];
     }
 
-    console.log(`Fetched ${data?.length || 0} reports from Supabase`);
-    if (data && data.length > 0) {
-      console.log('First report categorization sample:', data[0].data.transactions?.[0]?.category);
-    }
+    // Fetch global category settings to ensure consistency across all reports
+    const categorySettings = await storageService.getCategorySettings(userId);
 
-    // Ensure we return a clean SavedReport object
+    console.log(`Fetched ${data?.length || 0} reports from Supabase`);
+
+    // Ensure we return clean SavedReport objects with merged category settings
     return (data || []).map(row => {
       const report = row.data as SavedReport;
+      const transactions = (report.transactions || []).map(t => {
+        const cat = t.category || 'Other';
+        const globalDiscretionary = categorySettings[cat];
+        return {
+          ...t,
+          discretionary: globalDiscretionary !== undefined ? globalDiscretionary : t.discretionary
+        };
+      });
+
       return {
         status: 'completed', // Default for legacy reports
         progress: 100,      // Default for legacy reports
         ...report,
+        transactions,
         id: row.id, // Column takes precedence
         name: row.name,
         timestamp: row.timestamp

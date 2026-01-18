@@ -10,31 +10,62 @@ export const classifyTransactions = async (
 ): Promise<Transaction[]> => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
-  // 1. Fetch User Rules for the Learning Loop
+  // 1. Fetch User Rules and Settings
   const userRules = userId ? await storageService.getUserRules(userId) : [];
-  const rulesContext = userRules.length > 0
-    ? `\nIMPORTANT: The user has previously specified these category preferences. Use them as the absolute gold standard for these merchants: ${JSON.stringify(userRules.map(r => ({ merchant: r.merchant_pattern, preferred_category: r.preferred_category })))}`
-    : "";
-
-  // 2. Fetch Category Settings (Discretionary vs Non-Discretionary)
   const categorySettings = userId ? await storageService.getCategorySettings(userId) : {};
-  const categoryContext = Object.keys(categorySettings).length > 0
-    ? `\nIMPORTANT: Use these user preferences for classification type (Discretionary vs Non-Discretionary): ${JSON.stringify(categorySettings)}. If a category is in this list, its 'is_discretionary' value MUST match the value here.`
-    : "";
+
+  const totalTransactions = transactions.length;
+  const finalResults: Transaction[] = [];
+  const transactionsToClassify: Transaction[] = [];
+  const descriptionToTransactions = new Map<string, Transaction[]>();
+
+  // 2. Pre-process: Apply local rules and group remaining by description
+  transactions.forEach(t => {
+    // Check for an exact manual rule for this description
+    const rule = userRules.find(r => r.merchant_pattern === t.description);
+
+    if (rule) {
+      const cat = rule.preferred_category;
+      finalResults.push({
+        ...t,
+        category: cat,
+        discretionary: categorySettings[cat] !== undefined ? categorySettings[cat] : t.discretionary,
+        groundingSources: undefined // Rules are deterministic
+      });
+    } else {
+      transactionsToClassify.push(t);
+      const list = descriptionToTransactions.get(t.description) || [];
+      list.push(t);
+      descriptionToTransactions.set(t.description, list);
+    }
+  });
+
+  // If everything was handled by local rules, we're done!
+  if (transactionsToClassify.length === 0) {
+    onProgress?.(100, finalResults);
+    return finalResults;
+  }
+
+  // Report initial progress for rule-matched items
+  if (finalResults.length > 0) {
+    onProgress?.(Math.round((finalResults.length / totalTransactions) * 100), finalResults);
+  }
+
+  // 3. Prep Unique Unknowns for Gemini
+  const uniqueDescriptions = Array.from(descriptionToTransactions.keys());
+  const uniqueDataForAI = uniqueDescriptions.map((desc, idx) => ({
+    id: `u-${idx}`, // Use a unique temporary ID for the batch
+    description: desc
+    // We omit amount here to ensure the AI focuses on identifying the merchant itself, 
+    // which leads to better consistency for the same merchant name.
+  }));
 
   const BATCH_SIZE = 50;
-  const totalTransactions = transactions.length;
-  const processedTransactions: Transaction[] = [];
+  let processedCount = finalResults.length;
 
-  for (let i = 0; i < totalTransactions; i += BATCH_SIZE) {
-    const batch = transactions.slice(i, i + BATCH_SIZE);
-    const batchData = batch.map(t => ({
-      id: t.id,
-      description: t.description,
-      amount: t.amount
-    }));
-
-    const prompt = `Classify these transactions: ${JSON.stringify(batchData)}`;
+  for (let i = 0; i < uniqueDataForAI.length; i += BATCH_SIZE) {
+    const batch = uniqueDataForAI.slice(i, i + BATCH_SIZE);
+    const prompt = `Classify these unique merchants: ${JSON.stringify(batch)}`;
 
     try {
       const responseContent: GenerateContentResponse = await ai.models.generateContent({
@@ -42,20 +73,17 @@ export const classifyTransactions = async (
         contents: prompt,
         config: {
           systemInstruction: `
-            You are an expert financial analyst. Your task is to classify credit card transactions into categories and determine if they are Discretionary or Non-Discretionary.
+            You are an expert financial analyst. Your task is to identify merchants and classify them.
             
             Available categories: Food - Supermarkets, Food - Dining, Shopping, Housing, Transportation, Utilities, Entertainment, Healthcare, Income, Travel, Insurance, Subscriptions, Other.
             
-            If a merchant description is ambiguous or unknown, use your internal knowledge and the Google Search tool to identify the merchant and its business type.
-            ${rulesContext}
-            ${categoryContext}
-            
             Discretionary vs Non-Discretionary:
-            - Non-Discretionary: Essential bills, rent, utilities, insurance, healthcare, basic groceries (Supermarkets), income.
-            - Discretionary: Dining out, luxury shopping, entertainment, travel, non-essential subscriptions.
+            - Non-Discretionary (Essential): Essential bills, rent, utilities (power/water), insurance, healthcare/doctors, basic groceries (Supermarkets), income.
+            - Discretionary (Lifestyle): Dining out/cafes, luxury shopping, movies/games, travel/holidays, non-essential subscriptions (Netflix/Gym).
             
-            Return the result as a JSON array of objects, each with 'id', 'category', and 'is_discretionary' (boolean).
-            Only return valid JSON.
+            Return a JSON array of objects: { "id": string, "category": string, "is_discretionary": boolean }.
+            Maintain 100% consistency. If a merchant is identified as a Gym, it should be Subscriptions/Discretionary unless user settings say otherwise.
+            Only return valid JSON. Use Google Search to identify unknown merchants.
           `,
           tools: [{ googleSearch: {} }],
           responseMimeType: "application/json",
@@ -75,41 +103,54 @@ export const classifyTransactions = async (
       });
 
       const classifications = JSON.parse(responseContent.text || "[]");
-
-      // Extract grounding sources if search was used
       const groundingChunks = responseContent.candidates?.[0]?.groundingMetadata?.groundingChunks;
       const sources: GroundingSource[] = groundingChunks?.map((chunk: any) => ({
         title: chunk.web?.title || "Search Result",
         uri: chunk.web?.uri || "#"
       })) || [];
 
-      const classifiedBatch = batch.map(t => {
-        const classification = classifications.find((r: any) => r.id === t.id);
-        return {
-          ...t,
-          category: classification?.category || "Other",
-          discretionary: classification?.is_discretionary ?? true,
-          groundingSources: sources.length > 0 ? sources : undefined
-        };
+      const classifiedInThisBatch: Transaction[] = [];
+
+      classifications.forEach((res: any) => {
+        const uIdx = parseInt(res.id.replace('u-', ''));
+        const desc = uniqueDescriptions[uIdx];
+        const matchingTransactions = descriptionToTransactions.get(desc) || [];
+
+        // Apply choice to ALL transactions with this description for 100% consistency
+        matchingTransactions.forEach(t => {
+          const cat = res.category;
+          // Apply global settings override if they exist
+          const finalDiscretionary = categorySettings[cat] !== undefined ? categorySettings[cat] : res.is_discretionary;
+
+          classifiedInThisBatch.push({
+            ...t,
+            category: cat,
+            discretionary: finalDiscretionary,
+            groundingSources: sources.length > 0 ? sources : undefined
+          });
+        });
       });
 
-      processedTransactions.push(...classifiedBatch);
+      finalResults.push(...classifiedInThisBatch);
+      processedCount += classifiedInThisBatch.length;
 
-      if (onProgress) {
-        const progress = Math.round(((i + batch.length) / totalTransactions) * 100);
-        onProgress(progress, classifiedBatch);
-      }
+      onProgress?.(Math.round((processedCount / totalTransactions) * 100), classifiedInThisBatch);
+
     } catch (error) {
       console.error(`Gemini Classification Error in batch starting at ${i}:`, error);
-      // Fallback for this batch: Mark all as 'Other' to keep going
-      const fallbackBatch = batch.map(t => ({ ...t, category: 'Other' }));
-      processedTransactions.push(...fallbackBatch);
-      if (onProgress) {
-        const progress = Math.round(((i + batch.length) / totalTransactions) * 100);
-        onProgress(progress, fallbackBatch);
-      }
+      // Fallback: mark all in this batch as Other
+      const fallbackBatch: Transaction[] = [];
+      batch.forEach(item => {
+        const originals = descriptionToTransactions.get(item.description) || [];
+        originals.forEach(t => {
+          fallbackBatch.push({ ...t, category: 'Other', discretionary: true });
+        });
+      });
+      finalResults.push(...fallbackBatch);
+      processedCount += fallbackBatch.length;
+      onProgress?.(Math.round((processedCount / totalTransactions) * 100), fallbackBatch);
     }
   }
 
-  return processedTransactions;
+  return finalResults;
 };

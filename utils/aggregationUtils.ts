@@ -54,10 +54,49 @@ export interface TrendDataPoint {
 }
 
 /**
+ * Determines a consistent classification for each category across all reports.
+ * Prioritizes explicit user settings if available.
+ */
+export const getCategoryClassification = (
+    reports: SavedReport[],
+    userSettings?: Record<string, boolean>
+): Record<string, boolean> => {
+    const classification: Record<string, boolean> = {};
+
+    reports.forEach(report => {
+        report.transactions.forEach(t => {
+            if (t.amount >= 0) return;
+            const cat = t.category || 'Other';
+
+            // 1. Explicit user settings take top priority
+            if (userSettings && userSettings[cat] !== undefined) {
+                classification[cat] = userSettings[cat];
+                return;
+            }
+
+            // 2. Already marked as non-discretionary (false) in this pass? keep it.
+            if (classification[cat] === false) return;
+
+            // 3. Set based on transaction-level flag
+            classification[cat] = t.discretionary !== false;
+        });
+    });
+
+    return classification;
+};
+
+/**
  * Aggregates expense data across all reports, grouped by month and discretionary status.
  */
-export const aggregateTrendData = (reports: SavedReport[], mode: 'calendar' | 'mid-month'): TrendDataPoint[] => {
+export const aggregateTrendData = (
+    reports: SavedReport[],
+    mode: 'calendar' | 'mid-month',
+    categoryClassification?: Record<string, boolean>
+): TrendDataPoint[] => {
     const monthMap: Record<string, { discretionary: number; nonDiscretionary: number; categories: Record<string, number> }> = {};
+
+    // Use provided classification or calculate it
+    const classification = categoryClassification || getCategoryClassification(reports);
 
     reports.forEach(report => {
         report.transactions.forEach(t => {
@@ -73,12 +112,13 @@ export const aggregateTrendData = (reports: SavedReport[], mode: 'calendar' | 'm
 
             const absAmount = Math.abs(t.amount);
             const cat = t.category || 'Other';
+            const isDiscretionary = classification[cat] !== false;
 
             // Track total by discretionary status
-            if (t.discretionary === false) {
-                monthMap[month].nonDiscretionary += absAmount;
-            } else {
+            if (isDiscretionary) {
                 monthMap[month].discretionary += absAmount;
+            } else {
+                monthMap[month].nonDiscretionary += absAmount;
             }
 
             // Track category-specific total
