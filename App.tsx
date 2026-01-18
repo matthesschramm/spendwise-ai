@@ -390,22 +390,44 @@ const App: React.FC = () => {
   };
 
   const handleEditDate = (txId: string, newDate: string) => {
-    const updatedTransactions = transactions.map(t =>
-      t.id === txId ? { ...t, date: newDate } : t
-    );
-    setTransactions(updatedTransactions);
+    const updateReportTransactions = (report: SavedReport): SavedReport => ({
+      ...report,
+      transactions: report.transactions.map(t =>
+        t.id === txId ? { ...t, date: newDate } : t
+      )
+    });
+
+    let matchedReport: SavedReport | null = null;
+    const updatedSavedReports = savedReports.map(report => {
+      const hasTx = report.transactions.some(t => t.id === txId);
+      if (!hasTx) return report;
+      const updatedReport = updateReportTransactions(report);
+      matchedReport = updatedReport;
+      return updatedReport;
+    });
+
+    if (matchedReport) {
+      setSavedReports(updatedSavedReports);
+      if (currentReport?.id === matchedReport.id) {
+        setCurrentReport(matchedReport);
+        setTransactions(matchedReport.transactions);
+      }
+      if (session) {
+        storageService.saveReport(matchedReport, session.user.id)
+          .catch(err => console.error('Failed to save report after date edit:', err));
+      }
+      return;
+    }
 
     if (currentReport) {
-      const updatedReport: SavedReport = {
-        ...currentReport,
-        transactions: updatedTransactions
-      };
+      const updatedReport = updateReportTransactions(currentReport);
       setCurrentReport(updatedReport);
-
+      setTransactions(updatedReport.transactions);
       if (session) {
         storageService.saveReport(updatedReport, session.user.id)
           .catch(err => console.error('Failed to save report after date edit:', err));
       }
+    } else {
     }
   };
 
