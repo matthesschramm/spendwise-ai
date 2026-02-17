@@ -2,6 +2,7 @@
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { Transaction, GroundingSource } from "../types";
 import { storageService } from "./storageService";
+import { normalizeDescription } from "../utils/descriptionUtils";
 
 export const classifyTransactions = async (
   transactions: Transaction[],
@@ -19,10 +20,11 @@ export const classifyTransactions = async (
   const transactionsToClassify: Transaction[] = [];
   const descriptionToTransactions = new Map<string, Transaction[]>();
 
-  // 2. Pre-process: Apply local rules and group remaining by description
+  // 2. Pre-process: Apply local rules and group remaining by normalized description
   transactions.forEach(t => {
-    // Check for an exact manual rule for this description
-    const rule = userRules.find(r => r.merchant_pattern === t.description);
+    // Check for a manual rule using normalized descriptions (strips unique transaction IDs)
+    const normalizedDesc = normalizeDescription(t.description);
+    const rule = userRules.find(r => normalizeDescription(r.merchant_pattern) === normalizedDesc);
 
     if (rule) {
       const cat = rule.preferred_category;
@@ -34,9 +36,9 @@ export const classifyTransactions = async (
       });
     } else {
       transactionsToClassify.push(t);
-      const list = descriptionToTransactions.get(t.description) || [];
+      const list = descriptionToTransactions.get(normalizedDesc) || [];
       list.push(t);
-      descriptionToTransactions.set(t.description, list);
+      descriptionToTransactions.set(normalizedDesc, list);
     }
   });
 

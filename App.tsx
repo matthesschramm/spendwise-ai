@@ -15,6 +15,7 @@ import MonthlySpreadsheet from './components/MonthlySpreadsheet';
 import LandingPage from './components/LandingPage';
 import { Session } from '@supabase/supabase-js';
 import { getAggregatedTransactions, getUniqueMonthsFromReports } from './utils/aggregationUtils';
+import { normalizeDescription } from './utils/descriptionUtils';
 import PeriodDashboard from './components/PeriodDashboard';
 import TrendAnalysis from './components/TrendAnalysis';
 
@@ -383,7 +384,7 @@ const App: React.FC = () => {
 
     // SpendWise Learning Loop: Persist this preference to Supabase
     if (session && transactionForRule && didUpdate) {
-      storageService.saveUserRule(session.user.id, transactionForRule.description, normalizedCategory)
+      storageService.saveUserRule(session.user.id, normalizeDescription(transactionForRule.description), normalizedCategory)
         .catch(err => console.error('Failed to save learning rule:', err));
     }
   };
