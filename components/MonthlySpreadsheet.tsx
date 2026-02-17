@@ -493,7 +493,7 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                                                 className={`p-4 text-sm font-black text-right transition-colors ${val > 0 ? varianceStyle : 'text-slate-300'} hover:bg-emerald-100/50 cursor-help relative`}
                                                 onMouseEnter={(e) => {
                                                     const rect = e.currentTarget.getBoundingClientRect();
-                                                    if (val > 0) {
+                                                    if (val !== 0 && cell) {
                                                         clearTooltipTimer();
                                                         setActiveTooltip({
                                                             title: `${cat} - ${month}`,
@@ -517,7 +517,10 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                                     ${tableData.incomeCategories.reduce((acc, cat) => acc + (categoryBudgets[cat] || 0), 0).toLocaleString()}
                                 </td>
                                 {tableData.months.map(month => {
-                                    const totalIn = tableData.incomeCategories.reduce((acc, cat) => acc + (tableData.data[month][cat]?.total || 0), 0);
+                                    const totalIn = tableData.incomeCategories.reduce((acc, cat) => {
+                                        const val = tableData.data[month][cat]?.total || 0;
+                                        return acc + (val > 0 ? val : 0);
+                                    }, 0);
                                     return (
                                         <td key={month} className="p-4 text-sm text-emerald-700 text-right">
                                             ${totalIn.toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -581,7 +584,7 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                                                 className={`p-4 text-sm font-black text-right transition-colors ${val < 0 ? varianceStyle : 'text-slate-300'} hover:bg-red-100/50 cursor-help relative`}
                                                 onMouseEnter={(e) => {
                                                     const rect = e.currentTarget.getBoundingClientRect();
-                                                    if (val < 0) {
+                                                    if (val !== 0 && cell) {
                                                         clearTooltipTimer();
                                                         setActiveTooltip({
                                                             title: `${cat} - ${month}`,
@@ -605,7 +608,10 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                                     ${tableData.expenseCategories.reduce((acc, cat) => acc + (categoryBudgets[cat] || 0), 0).toLocaleString()}
                                 </td>
                                 {tableData.months.map(month => {
-                                    const totalOut = tableData.expenseCategories.reduce((acc, cat) => acc + (tableData.data[month][cat]?.total || 0), 0);
+                                    const totalOut = tableData.expenseCategories.reduce((acc, cat) => {
+                                        const val = tableData.data[month][cat]?.total || 0;
+                                        return acc + (val < 0 ? val : 0);
+                                    }, 0);
                                     return (
                                         <td key={month} className="p-4 text-sm text-red-700 text-right">
                                             ${Math.abs(totalOut).toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -621,8 +627,14 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                                     ${(tableData.incomeCategories.reduce((acc, cat) => acc + (categoryBudgets[cat] || 0), 0) - tableData.expenseCategories.reduce((acc, cat) => acc + (categoryBudgets[cat] || 0), 0)).toLocaleString()}
                                 </td>
                                 {tableData.months.map(month => {
-                                    const totalIn = tableData.incomeCategories.reduce((acc, cat) => acc + (tableData.data[month][cat]?.total || 0), 0);
-                                    const totalOut = tableData.expenseCategories.reduce((acc, cat) => acc + (tableData.data[month][cat]?.total || 0), 0);
+                                    const totalIn = tableData.incomeCategories.reduce((acc, cat) => {
+                                        const val = tableData.data[month][cat]?.total || 0;
+                                        return acc + (val > 0 ? val : 0);
+                                    }, 0);
+                                    const totalOut = tableData.expenseCategories.reduce((acc, cat) => {
+                                        const val = tableData.data[month][cat]?.total || 0;
+                                        return acc + (val < 0 ? val : 0);
+                                    }, 0);
                                     const net = totalIn + totalOut;
                                     return (
                                         <td key={month} className={`p-4 text-sm text-right ${net >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
