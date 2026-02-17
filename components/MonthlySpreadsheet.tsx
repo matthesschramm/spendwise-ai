@@ -193,6 +193,7 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
     const [incomeOrder, setIncomeOrder] = React.useState<string[]>([]);
     const [draggedCategory, setDraggedCategory] = React.useState<{ name: string; type: 'income' | 'expense' } | null>(null);
     const [dragOverCategory, setDragOverCategory] = React.useState<string | null>(null);
+    const [tooltipMode, setTooltipMode] = React.useState<'hover' | 'click'>('hover');
     const closeTimeout = React.useRef<NodeJS.Timeout | null>(null);
 
     React.useEffect(() => {
@@ -415,13 +416,34 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                         {mode === 'mid-month' ? 'Mid-Month View (15th - 14th)' : 'Standard Calendar View'}
                     </p>
                 </div>
-                <button
-                    onClick={onBack}
-                    className="text-sm font-bold text-slate-500 hover:text-slate-800 flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-slate-100 transition-all"
-                >
-                    <i className="fa-solid fa-arrow-left"></i>
-                    Back to Dashboard
-                </button>
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">Tooltip</span>
+                        <div className="flex bg-slate-100 rounded-xl p-0.5">
+                            <button
+                                onClick={() => setTooltipMode('hover')}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${tooltipMode === 'hover' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                            >
+                                <i className="fa-solid fa-arrow-pointer text-[10px]"></i>
+                                Hover
+                            </button>
+                            <button
+                                onClick={() => setTooltipMode('click')}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${tooltipMode === 'click' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                            >
+                                <i className="fa-solid fa-hand-pointer text-[10px]"></i>
+                                Click
+                            </button>
+                        </div>
+                    </div>
+                    <button
+                        onClick={onBack}
+                        className="text-sm font-bold text-slate-500 hover:text-slate-800 flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-slate-100 transition-all"
+                    >
+                        <i className="fa-solid fa-arrow-left"></i>
+                        Back to Dashboard
+                    </button>
+                </div>
             </div>
 
             <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden border-separate">
@@ -490,8 +512,8 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                                         return (
                                             <td
                                                 key={month}
-                                                className={`p-4 text-sm font-black text-right transition-colors ${val > 0 ? varianceStyle : 'text-slate-300'} hover:bg-emerald-100/50 cursor-help relative`}
-                                                onMouseEnter={(e) => {
+                                                className={`p-4 text-sm font-black text-right transition-colors ${val > 0 ? varianceStyle : 'text-slate-300'} hover:bg-emerald-100/50 ${tooltipMode === 'hover' ? 'cursor-help' : 'cursor-pointer'} relative`}
+                                                onMouseEnter={tooltipMode === 'hover' ? (e) => {
                                                     const rect = e.currentTarget.getBoundingClientRect();
                                                     if (val !== 0 && cell) {
                                                         clearTooltipTimer();
@@ -502,8 +524,20 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                                                             position: { x: rect.left, y: rect.bottom }
                                                         });
                                                     }
-                                                }}
-                                                onMouseLeave={startTooltipTimer}
+                                                } : undefined}
+                                                onMouseLeave={tooltipMode === 'hover' ? startTooltipTimer : undefined}
+                                                onClick={tooltipMode === 'click' ? (e) => {
+                                                    const rect = e.currentTarget.getBoundingClientRect();
+                                                    if (val !== 0 && cell) {
+                                                        clearTooltipTimer();
+                                                        setActiveTooltip({
+                                                            title: `${cat} - ${month}`,
+                                                            total: val,
+                                                            transactions: cell.transactions,
+                                                            position: { x: rect.left, y: rect.bottom }
+                                                        });
+                                                    }
+                                                } : undefined}
                                             >
                                                 {val !== 0 ? `$${val.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '-'}
                                             </td>
@@ -581,8 +615,8 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                                         return (
                                             <td
                                                 key={month}
-                                                className={`p-4 text-sm font-black text-right transition-colors ${val < 0 ? varianceStyle : 'text-slate-300'} hover:bg-red-100/50 cursor-help relative`}
-                                                onMouseEnter={(e) => {
+                                                className={`p-4 text-sm font-black text-right transition-colors ${val < 0 ? varianceStyle : 'text-slate-300'} hover:bg-red-100/50 ${tooltipMode === 'hover' ? 'cursor-help' : 'cursor-pointer'} relative`}
+                                                onMouseEnter={tooltipMode === 'hover' ? (e) => {
                                                     const rect = e.currentTarget.getBoundingClientRect();
                                                     if (val !== 0 && cell) {
                                                         clearTooltipTimer();
@@ -593,8 +627,20 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                                                             position: { x: rect.left, y: rect.bottom }
                                                         });
                                                     }
-                                                }}
-                                                onMouseLeave={startTooltipTimer}
+                                                } : undefined}
+                                                onMouseLeave={tooltipMode === 'hover' ? startTooltipTimer : undefined}
+                                                onClick={tooltipMode === 'click' ? (e) => {
+                                                    const rect = e.currentTarget.getBoundingClientRect();
+                                                    if (val !== 0 && cell) {
+                                                        clearTooltipTimer();
+                                                        setActiveTooltip({
+                                                            title: `${cat} - ${month}`,
+                                                            total: val,
+                                                            transactions: cell.transactions,
+                                                            position: { x: rect.left, y: rect.bottom }
+                                                        });
+                                                    }
+                                                } : undefined}
                                             >
                                                 {val !== 0 ? `$${absVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '-'}
                                             </td>
@@ -657,7 +703,7 @@ const MonthlySpreadsheet: React.FC<MonthlySpreadsheetProps> = ({ reports, onBack
                     <p className="text-blue-700 text-sm mt-1 leading-relaxed">
                         This view aggregates all transactions from your saved reports.
                         Rows are dynamically generated based on the categories found in your statement history.
-                        <span className="font-bold underline ml-1">Hover over any value</span> to see the top transactions contributing to that amount.
+                        <span className="font-bold underline ml-1">{tooltipMode === 'hover' ? 'Hover over' : 'Click on'} any value</span> to see the top transactions contributing to that amount.
                     </p>
                 </div>
             </div>
