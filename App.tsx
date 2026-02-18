@@ -18,6 +18,7 @@ import { getAggregatedTransactions, getUniqueMonthsFromReports } from './utils/a
 import { normalizeDescription } from './utils/descriptionUtils';
 import PeriodDashboard from './components/PeriodDashboard';
 import TrendAnalysis from './components/TrendAnalysis';
+import BudgetProgressView from './components/BudgetProgressView';
 
 // New specialized components for UX 2.0
 const ProcessingBar: React.FC<{ progress: number }> = ({ progress }) => (
@@ -53,6 +54,7 @@ const NavigationBar: React.FC<{ activeTab: AppState | null, onTabChange: (tab: A
     { id: AppState.IDLE, label: 'Import', icon: 'fa-file-import' },
     { id: AppState.MONTHLY_VIEW, label: 'Monthly View', icon: 'fa-table-list' },
     { id: AppState.MID_MONTH_VIEW, label: 'Mid-Month View', icon: 'fa-calendar-day' },
+    { id: AppState.BUDGET_PROGRESS, label: 'Budget Tracker', icon: 'fa-bullseye' },
     { id: AppState.TREND_ANALYSIS, label: 'Trends', icon: 'fa-chart-line' },
     { id: AppState.PERIOD_DASHBOARD, label: 'Period Dashboard', icon: 'fa-gauge-high' },
     { id: AppState.REPORTS, label: 'Reports', icon: 'fa-clock-rotate-left' },
@@ -690,6 +692,18 @@ const App: React.FC = () => {
             reports={savedReports}
             onBack={() => setStatus(AppState.IDLE)}
             mode="mid-month"
+            userId={session.user.id}
+            onEditDate={handleEditDate}
+            onDeleteTransaction={handleDeleteTransaction}
+            onEditCategory={handleEditTransactionCategory}
+            availableCategories={allCategories}
+          />
+        )}
+
+        {status === AppState.BUDGET_PROGRESS && (
+          <BudgetProgressView
+            reports={savedReports}
+            onBack={() => setStatus(AppState.IDLE)}
             userId={session.user.id}
             onEditDate={handleEditDate}
             onDeleteTransaction={handleDeleteTransaction}
